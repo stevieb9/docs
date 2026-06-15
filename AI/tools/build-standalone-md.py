@@ -126,12 +126,15 @@ if toc_tail in text:
         1,
     )
 
-# 3. Document footer: put the copyright on its own line below the license.
-#    `text` is the README only (the appendix is appended below), so this targets
-#    the document footer and leaves the verbatim appendix files untouched.
+# 3. Document footer: copyright first, then the license, separated by a blank
+#    line. `text` is the README only (the appendix is appended below), so this
+#    targets the document footer and leaves the verbatim appendix files alone.
 text = text.replace(
-    "artistic-license-20.html). © 2026 Steve Bertrand.",
-    "artistic-license-20.html).\n\n© 2026 Steve Bertrand.",
+    "Licensed under the [Artistic License 2.0]"
+    "(https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.",
+    "© 2026 Steve Bertrand.\n\n"
+    "Licensed under the [Artistic License 2.0]"
+    "(https://www.perlfoundation.org/artistic-license-20.html).",
     1,
 )
 
