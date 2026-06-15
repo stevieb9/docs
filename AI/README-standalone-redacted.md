@@ -5,49 +5,27 @@
 ## Contents
 
 - [Overview](#overview)
-
 - [Directory structure](#directory-structure)
-
 - [Loading structure](#loading-structure)
-
 - [Phrase commands](#phrase-commands)
-
 - [Hooks](#hooks)
-
 - [Scripts](#scripts-hooks)
-
 - [Settings](#settings-settingsjson)
-
 - [Rules](#rules-rules)
-
 - [How rules load](#how-rules-load)
-
-- [git](#appendix-rules-git-md)
-
-- [perl](#appendix-rules-perl-md)
-
-- [dev-guardrail](#appendix-rules-dev-guardrail-md)
-
+- [git](#gitmd--sessionstart-hook)
+- [perl](#perlmd--pretooluse-hook-on-read)
+- [dev-guardrail](#dev-guardrailmd--pretoolusebash-guard-hostname-gated-zero-token)
 - [Skills](#skills-skills)
-
-- [Create structured plans with task tracking](#appendix-skills-create-plan-md)
-
-- [Follow a setup doc step-by-step on a clean target](#appendix-skills-implement-from-instruction-file-md)
-
-- [Sync changes to a remote host for testing](#appendix-skills-remote-code-sync-md)
-
-- [Debate a decision with another looping LLM](#appendix-skills-debate-md)
-
+- [Create structured plans with task tracking](#skillscreate-planmd)
+- [Follow a setup doc step-by-step on a clean target](#skillsimplement-from-instruction-filemd)
+- [Sync changes to a remote host for testing](#skillsremote-code-syncmd)
+- [Debate a decision with another looping LLM](#skillsdebatemd)
 - [Context](#context-context)
-
 - [Instructions](#instructions-instructions)
-
 - [Ansible Integration](#ansible-integration)
-
 - [Manual setup on a foreign machine](#manual-setup-on-a-foreign-non-ansible-machine)
-
 - [Backing up Claude](#backing-up-claude)
-
 - [Appendix: bundled resource files](#appendix-bundled-resource-files)
 
 ## Overview
