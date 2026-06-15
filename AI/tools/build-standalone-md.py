@@ -126,17 +126,7 @@ if toc_tail in text:
         1,
     )
 
-# 3. Visible redaction note under the title.
-note = (
-    "> **Redacted for public sharing.** Employer-specific identifiers have been "
-    "masked: production-adjacent hostnames as `<company-host>`, the internal Perl "
-    "package as `<COMPANY>`, its env symbol as `<COMPANY_ENV>`, the dev-DB hostname "
-    "prefix as `<dev-db>`, and the dev-env flag as `<DEV_FLAG>`. Everything else is "
-    "verbatim.\n"
-)
-text = text.replace("# AI Configuration\n", "# AI Configuration\n\n" + note, 1)
-
-# 4. Build the appendix — each linked file embedded verbatim. No <a id> tags;
+# 3. Build the appendix — each linked file embedded verbatim. No <a id> tags;
 #    the "### {relpath}" heading's own slug is the anchor target.
 parts = [
     text.rstrip(),

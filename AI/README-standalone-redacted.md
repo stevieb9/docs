@@ -1,7 +1,5 @@
 # AI Configuration
 
-> **Redacted for public sharing.** Employer-specific identifiers have been masked: production-adjacent hostnames as `<company-host>`, the internal Perl package as `<COMPANY>`, its env symbol as `<COMPANY_ENV>`, the dev-DB hostname prefix as `<dev-db>`, and the dev-env flag as `<DEV_FLAG>`. Everything else is verbatim.
-
 ## Contents
 
 - [Overview](#overview)
