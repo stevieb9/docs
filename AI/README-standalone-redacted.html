@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Configuration — standalone bundle (redacted)</title>
+<style>
+  :root { color-scheme: light; }
+  body { max-width: 900px; margin: 0 auto; padding: 2.2rem 1.3rem 5rem;
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica,
+         Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #1f2328;
+         background: #ffffff; }
+  h1, h2, h3, h4 { font-weight: 600; line-height: 1.25; margin: 1.8em 0 0.6em; }
+  h1 { font-size: 2em; padding-bottom: .3em; border-bottom: 1px solid #d1d9e0; }
+  h2 { font-size: 1.5em; padding-bottom: .3em; border-bottom: 1px solid #d1d9e0; }
+  h3 { font-size: 1.2em; }
+  a { color: #0969da; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  p, li { overflow-wrap: break-word; }
+  code { background: rgba(129,139,152,.16); padding: .2em .4em; border-radius: 6px;
+         font-size: 85%; font-family: ui-monospace, SFMono-Regular, Menlo,
+         Consolas, monospace; }
+  pre { background: #f6f8fa; padding: 14px 16px; border-radius: 8px;
+        overflow-x: auto; line-height: 1.45; }
+  pre code { background: transparent; padding: 0; font-size: 85%; }
+  table { display: block; width: max-content; max-width: 100%; overflow-x: auto;
+          border-collapse: collapse; margin: 1em 0; }
+  th, td { border: 1px solid #d1d9e0; padding: 6px 13px; vertical-align: top; }
+  thead th { background: #f6f8fa; }
+  tbody tr:nth-child(even) { background: #f6f8fa; }
+  blockquote { margin: 1em 0; padding: 0 1em; color: #59636e;
+               border-left: .25em solid #d1d9e0; }
+  hr { border: 0; border-top: 1px solid #d1d9e0; margin: 2em 0; }
+  @media print {
+    @page { margin: 1.4cm; }
+    body { max-width: none; margin: 0; padding: 0; font-size: 11px;
+           line-height: 1.45; }
+    a { color: #000; }
+    h1, h2, h3, h4 { page-break-after: avoid; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    table { display: table; width: 100%; table-layout: fixed; font-size: 9.5px; }
+    th, td { overflow-wrap: anywhere; word-break: break-word; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<h1 id="ai-configuration">AI Configuration</h1>
+<blockquote>
+<p><strong>Redacted for public sharing.</strong> Employer-specific identifiers have been masked: production-adjacent hostnames as <code>&lt;company-host&gt;</code>, the internal Perl package as <code>&lt;COMPANY&gt;</code>, its env symbol as <code>&lt;COMPANY_ENV&gt;</code>, the dev-DB hostname prefix as <code>&lt;dev-db&gt;</code>, and the dev-env flag as <code>&lt;DEV_FLAG&gt;</code>. Everything else is verbatim.</p>
+</blockquote>
+<h2 id="contents">Contents</h2>
+<ul>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#directory-structure">Directory structure</a></li>
+<li><a href="#loading-structure">Loading structure</a></li>
+<li><a href="#phrase-commands">Phrase commands</a></li>
+<li><a href="#hooks">Hooks</a></li>
+<li><a href="#scripts-hooks">Scripts</a></li>
+<li><a href="#settings-settingsjson">Settings</a></li>
+<li><a href="#rules-rules">Rules</a></li>
+<li><a href="#how-rules-load">How rules load</a></li>
+<li><a href="#appendix-rules-git-md">git</a></li>
+<li><a href="#appendix-rules-perl-md">perl</a></li>
+<li><a href="#appendix-rules-dev-guardrail-md">dev-guardrail</a></li>
+<li><a href="#skills-skills">Skills</a></li>
+<li><a href="#appendix-skills-create-plan-md">Create structured plans with task tracking</a></li>
+<li><a href="#appendix-skills-implement-from-instruction-file-md">Follow a setup doc step-by-step on a clean target</a></li>
+<li><a href="#appendix-skills-remote-code-sync-md">Sync changes to a remote host for testing</a></li>
+<li><a href="#appendix-skills-debate-md">Debate a decision with another looping LLM</a></li>
+<li><a href="#context-context">Context</a></li>
+<li><a href="#instructions-instructions">Instructions</a></li>
+<li><a href="#ansible-integration">Ansible Integration</a></li>
+<li><a href="#manual-setup-on-a-foreign-non-ansible-machine">Manual setup on a foreign machine</a></li>
+<li><a href="#backing-up-claude">Backing up Claude</a></li>
+<li><a href="#appendix-bundled-resource-files">Appendix: bundled resource files</a></li>
+</ul>
+<h2 id="overview">Overview</h2>
+<p>This directory contains rules, skills, hooks, context, settings, and instructions that configure Claude Code's behavior.</p>
+<h3 id="directory-structure">Directory structure</h3>
+<p>On new systems, symlink the following into <code>~/.claude/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Repo path</th>
+<th>What</th>
+<th><code>~/.claude/</code> symlink</th>
+<th>Symlink target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>instructions/CLAUDE.md</code></td>
+<td>Global system prompt loaded into every Claude session</td>
+<td><code>~/.claude/CLAUDE.md</code></td>
+<td><code>$HOME/repos/config/AI/instructions/CLAUDE.md</code></td>
+</tr>
+<tr>
+<td><code>rules/</code></td>
+<td>Coding &amp; git conventions, injected by hooks only when relevant</td>
+<td><code>~/.claude/rules/</code></td>
+<td><code>$HOME/repos/config/AI/rules/</code></td>
+</tr>
+<tr>
+<td><code>skills/</code></td>
+<td>Reusable multi-step task workflows, invoked on demand</td>
+<td><code>~/.claude/skills/</code></td>
+<td><code>$HOME/repos/config/AI/skills/</code></td>
+</tr>
+<tr>
+<td><code>hooks/</code></td>
+<td>Event-driven scripts that inject context or gate tool use</td>
+<td><code>~/.claude/hooks/</code></td>
+<td><code>$HOME/repos/config/AI/hooks/</code></td>
+</tr>
+<tr>
+<td><code>context/</code></td>
+<td>Context fragments injected only when a hook's trigger fires</td>
+<td><code>~/.claude/context/</code></td>
+<td><code>$HOME/repos/config/AI/context/</code></td>
+</tr>
+<tr>
+<td><code>settings.json</code></td>
+<td>Hook definitions plus model, theme, and permission preferences</td>
+<td><code>~/.claude/settings.json</code></td>
+<td><code>$HOME/repos/config/AI/settings.json</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="loading-structure">Loading structure</h3>
+<p>Everything is conditional — <strong>zero tokens until its trigger fires</strong> (the lone exception is <code>CLAUDE.md</code>, always present but currently an empty stub):</p>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Trigger</th>
+<th>Token use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>instructions/CLAUDE.md</code></td>
+<td>Always — the base prompt for every session</td>
+<td>Every session (~0, empty)</td>
+</tr>
+<tr>
+<td><code>rules/git.md</code></td>
+<td>Working directory is under <code>~/repos/</code> or <code>~/src/git/</code> — <code>SessionStart</code> hook</td>
+<td>0 until in a repo</td>
+</tr>
+<tr>
+<td><code>rules/perl.md</code></td>
+<td>You <code>Read</code> a Perl file matching its <code>paths:</code> patterns — <code>PreToolUse</code> hook</td>
+<td>0 until you open Perl</td>
+</tr>
+<tr>
+<td><code>rules/dev-guardrail.md</code></td>
+<td>Mechanical gate, not a context load — a <code>PreToolUse(Bash)</code> hook arms when cwd is under <code>~/src/git</code> <strong>and</strong> the host matches its <code>hosts:</code> patterns (<company-host>), then blocks Bash unless dev is confirmed</td>
+<td>0 always (never enters context; only a block emits text)</td>
+</tr>
+<tr>
+<td>magic-phrase skills &amp; context</td>
+<td>An exact phrase in your prompt — see <a href="#phrase-commands">Phrase commands</a></td>
+<td>0 until you type it</td>
+</tr>
+<tr>
+<td>other <code>skills/*.md</code></td>
+<td>Only when you ask Claude to read the file (manual)</td>
+<td>0 until loaded</td>
+</tr>
+</tbody>
+</table>
+<h2 id="phrase-commands">Phrase commands</h2>
+<p>Type any of these exact, case-sensitive phrases to summon a skill or framework on demand — <strong>zero idle cost</strong>, dispatched by <a href="#appendix-hooks-inject-on-phrase-sh"><code>inject-on-phrase.sh</code></a> (one table row each). They fire whether the phrase ends your message or has text after it.</p>
+<table>
+<thead>
+<tr>
+<th>Phrase</th>
+<th>What it does</th>
+<th>Where</th>
+<th>Example you type</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RECOMMEND TO ME</code></td>
+<td>Structured recommendation framework</td>
+<td>Only in a repo</td>
+<td><code>RECOMMEND TO ME whether to cache the parsed config in memory</code></td>
+<td>An analysis through these angles (author intent, least astonishment, current behaviour, with-docs, without-docs) ending in one synthesized verdict</td>
+</tr>
+<tr>
+<td><code>CREATE A PLAN</code></td>
+<td>create-plan skill (<code>.md</code>-aware naming)</td>
+<td>Anywhere</td>
+<td><code>CREATE A PLAN auth-refactor</code></td>
+<td>Scaffolds <code>plans/auth-refactor.md</code> with a validation table, execution/maintenance rules, and a <code>NEXT ACTION</code> line</td>
+</tr>
+<tr>
+<td><code>PREPARE DEBATE</code></td>
+<td>debate skill</td>
+<td>Anywhere</td>
+<td><code>PREPARE DEBATE should we keep the trailing-space triggers? 30s</code></td>
+<td>Creates a <code>/tmp</code> channel + a bootstrap prompt to paste into a challenger AI, then the two AIs argue to a verdict</td>
+</tr>
+</tbody>
+</table>
+<h2 id="hooks">Hooks</h2>
+<p>Hooks are event-driven automation that fire at specific points in Claude Code's lifecycle. They let you inject context, run validation, or gate tool use — without Claude needing to remember to do it. Hooks are defined in <code>settings.json</code> and run as shell commands (see <a href="#scripts-hooks">Scripts</a>); their stdout is captured and (for <code>additionalContext</code> hooks) injected into the next turn's context.</p>
+<p>See the <a href="https://code.claude.com/docs/en/hooks">Claude hooks documentation</a>.</p>
+<p>Key lifecycle events:</p>
+<ul>
+<li><strong><code>SessionStart</code></strong> — fires once when a session begins. Use for conditional context injection that depends on the working directory (e.g. repo-specific rules).</li>
+<li><strong><code>UserPromptSubmit</code></strong> — fires when you submit a prompt, <em>before</em> it's processed. The hook receives the prompt text and cwd, and can inject context or block the prompt. Use it to gate on what you actually typed (e.g. a magic-word trigger).</li>
+<li><strong><code>PreToolUse</code></strong> — fires <em>before</em> a tool executes. You can inspect the tool input, inject context about the file being operated on, or even block the tool by exiting non-zero.</li>
+<li><strong><code>PostToolUse</code></strong> — fires <em>after</em> a tool completes. Use for logging, notifications, or post-processing output.</li>
+<li><strong><code>Stop</code></strong> — fires when the session ends. Use for cleanup or persistent state writes.</li>
+</ul>
+<p>Hooks are configured in <a href="#appendix-settings-json"><code>settings.json</code></a>, symlinked to <code>~/.claude/settings.json</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Hook</th>
+<th>Event</th>
+<th>Purpose</th>
+<th>Token use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Git rules</td>
+<td><code>SessionStart</code></td>
+<td>Injects <code>git.md</code> when the working directory is under <code>~/repos/</code> or <code>~/src/git/</code></td>
+<td>0 until in a repo</td>
+</tr>
+<tr>
+<td>Perl rules</td>
+<td><code>PreToolUse</code> on <code>Read</code></td>
+<td>Runs <code>inject-perl-rules.sh</code> before every file read; on match, injects <code>perl.md</code></td>
+<td>0 until you open Perl</td>
+</tr>
+<tr>
+<td>Dev guardrail</td>
+<td><code>PreToolUse</code> on <code>Bash</code></td>
+<td>Runs <code>guard-dev-env.sh</code>; arms when cwd is under <code>~/src/git</code> <strong>and</strong> the host matches <code>dev-guardrail.md</code>'s <code>hosts:</code> patterns (<company-host>), then blocks Bash unless dev is confirmed (<code>&lt;DEV_FLAG&gt;</code> + <code>&lt;COMPANY_ENV&gt;</code> + MySQL <code>@@hostname</code>). <code>&lt;DEV_FLAG&gt;</code> re-checked every call; only the DB check is memoized (per-session, 5-min TTL). Fails closed</td>
+<td>0 on allow (nothing injected); only a block emits text</td>
+</tr>
+<tr>
+<td>Phrase commands</td>
+<td><code>UserPromptSubmit</code></td>
+<td><code>inject-on-phrase.sh</code> injects the mapped skill/fragment when the prompt contains one of its exact trigger phrases — see <a href="#phrase-commands">Phrase commands</a></td>
+<td>0 until you type a phrase</td>
+</tr>
+</tbody>
+</table>
+<p>The hook definitions in <code>settings.json</code> (the file also sets <code>model</code>, <code>theme</code>, and <code>skipAutoPermissionPrompt</code>):</p>
+<pre><code class="language-json">{
+  &quot;hooks&quot;: {
+    &quot;PreToolUse&quot;: [
+      {
+        &quot;matcher&quot;: &quot;Read&quot;,
+        &quot;hooks&quot;: [
+          {
+            &quot;type&quot;: &quot;command&quot;,
+            &quot;command&quot;: &quot;\&quot;$HOME/.claude/hooks/inject-perl-rules.sh\&quot;&quot;
+          }
+        ]
+      },
+      {
+        &quot;matcher&quot;: &quot;Bash&quot;,
+        &quot;hooks&quot;: [
+          {
+            &quot;type&quot;: &quot;command&quot;,
+            &quot;command&quot;: &quot;\&quot;$HOME/.claude/hooks/guard-dev-env.sh\&quot;&quot;
+          }
+        ]
+      }
+    ],
+    &quot;SessionStart&quot;: [
+      {
+        &quot;hooks&quot;: [
+          {
+            &quot;type&quot;: &quot;command&quot;,
+            &quot;command&quot;: &quot;d=\&quot;${CLAUDE_PROJECT_DIR:-$PWD}\&quot;; case \&quot;$d/\&quot; in \&quot;$HOME/repos/\&quot;*|\&quot;$HOME/src/git/\&quot;*) command -v jq &gt;/dev/null 2&gt;&amp;1 || { echo \&quot;SessionStart git.md hook: jq not installed; git rules NOT loaded\&quot; &gt;&amp;2; exit 2; }; [ -r \&quot;$HOME/.claude/rules/git.md\&quot; ] || { echo \&quot;SessionStart git.md hook: git.md not readable; git rules NOT loaded\&quot; &gt;&amp;2; exit 2; }; jq -Rs '{hookSpecificOutput:{hookEventName:\&quot;SessionStart\&quot;,additionalContext:.}}' \&quot;$HOME/repos/config/AI/rules/git.md\&quot; ;; esac&quot;
+          }
+        ]
+      }
+    ],
+    &quot;UserPromptSubmit&quot;: [
+      {
+        &quot;hooks&quot;: [
+          {
+            &quot;type&quot;: &quot;command&quot;,
+            &quot;command&quot;: &quot;\&quot;$HOME/.claude/hooks/inject-on-phrase.sh\&quot;&quot;
+          }
+        ]
+      }
+    ]
+  }
+}
+</code></pre>
+<p>The SessionStart hook requires <code>jq</code>. Inside the target trees, a missing <code>jq</code> or unreadable <code>git.md</code> errors loudly (exit 2 with stderr, shown to the user) instead of silently skipping. Outside those trees it does nothing. (On Ansible-managed hosts, <code>jq</code> is installed by the <code>core-packages</code> role — every <code>jq</code>-dependent hook relies on it.)</p>
+<p>The <code>UserPromptSubmit</code> dispatcher (<code>inject-on-phrase.sh</code>) takes the opposite tack on failure: it <strong>never</strong> exits non-zero — a non-zero <code>UserPromptSubmit</code> hook would <em>block your prompt</em> — so a missing <code>jq</code> or unreadable file degrades silently to injecting nothing. See <a href="#context-context">Context</a>.</p>
+<h3 id="scripts-hooks">Scripts (<code>hooks/</code>)</h3>
+<p>Scripts are executable helpers referenced by hooks — they live in <code>hooks/</code> (symlinked to <code>~/.claude/hooks/</code>). Inline hook commands in <code>settings.json</code> work for simple one-liners, but scripts are the right call when you need:</p>
+<ul>
+<li><strong>Preprocessing logic</strong> that's too complex for a JSON string — parsing YAML frontmatter, glob/regex matching, conditional branching.</li>
+<li><strong>Reuse</strong> across multiple hooks or hook events.</li>
+<li><strong>Debuggability</strong> — a standalone script can be tested and iterated on independently of Claude Code.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#appendix-hooks-inject-perl-rules-sh"><code>inject-perl-rules.sh</code></a></td>
+<td>PreToolUse hook script. Reads <code>paths:</code> patterns from <code>perl.md</code> frontmatter, converts them to regexes with python3, and injects the rule content when the file being read matches. The <code>hooks/</code> directory is symlinked as <code>~/.claude/hooks/</code>.</td>
+</tr>
+<tr>
+<td><a href="#appendix-hooks-inject-on-phrase-sh"><code>inject-on-phrase.sh</code></a></td>
+<td>UserPromptSubmit <strong>dispatcher</strong>. Reads <code>.cwd</code>/<code>.prompt</code> from the hook's stdin JSON and injects the file mapped to whichever exact, case-sensitive phrase the prompt contains. Its table: <code>RECOMMEND TO ME</code> → <code>context/recommend.md</code> (repo-gated), <code>CREATE A PLAN</code> → <code>skills/create-plan.md</code>, <code>PREPARE DEBATE</code> → <code>skills/debate.md</code>. Adding a trigger is one table row. Outputs nothing (zero tokens) otherwise; never exits non-zero so it can't block a prompt.</td>
+</tr>
+<tr>
+<td><a href="#appendix-hooks-guard-dev-env-sh"><code>guard-dev-env.sh</code></a></td>
+<td>PreToolUse(Bash) hook script. Arms only when the cwd is under <code>~/src/git</code> <strong>and</strong> the system hostname (<code>hostname -f</code>) matches the <code>hosts:</code> globs in <code>dev-guardrail.md</code> (<company-host>). When armed, it verifies the dev signals (<code>&lt;DEV_FLAG&gt;</code>, <code>$&lt;COMPANY&gt;::Config::&lt;COMPANY_ENV&gt;</code>, MySQL <code>@@hostname =~ /^&lt;dev-db&gt;/</code>) and <strong>blocks</strong> (exit 2) any Bash command if the environment is not dev — failing closed on error. <code>&lt;DEV_FLAG&gt;</code> (free) is re-checked every call; only the DB hostname check is memoized, in a per-session <code>/tmp</code> flag with a 5-min TTL, and only with a real <code>session_id</code> — so a stale flag can't grant false safety. Allow path emits nothing (zero model tokens); when not armed it exits in a few cheap shell ops (cwd check first, before any <code>hostname</code> call or DB connect). Patterns live in one place: the rule file's frontmatter.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="settings-settingsjson">Settings (<code>settings.json</code>)</h3>
+<p><a href="#appendix-settings-json"><code>settings.json</code></a> is the global Claude Code settings file, symlinked to <code>~/.claude/settings.json</code>. It contains hook definitions, model preference, theme, and the <code>skipAutoPermissionPrompt</code> flag. The hooks use <code>$HOME</code>-relative paths (<code>~/.claude/…</code> and the repo clone under <code>~/repos/</code>), so they resolve whether <code>$HOME</code> is <code>/Users/steve</code> or <code>/home/steve</code>.</p>
+<h2 id="rules-rules">Rules (<code>rules/</code>)</h2>
+<p>Rules enforce conventions for specific file types and contexts. They are symlinked to <code>~/.claude/rules/</code> — but that symlink only makes them <em>available</em> to the hooks; it does not load them (see <a href="#how-rules-load">How rules load</a>).</p>
+<p>The <strong>project memory system</strong> (<code>~/.claude/projects/&lt;project&gt;/memory/</code>) also stores persistent preferences — these function like rules but are scoped to a specific project and learned from feedback rather than hand-authored. Those directories are machine-local (under <code>~/.claude/projects/</code>, outside this repo — backed up separately; see <a href="#backing-up-claude">Backing up Claude</a>), so this repo ships none directly.</p>
+<p><strong>Important — rules are <em>not</em> auto-loaded.</strong> Claude Code has no <code>~/.claude/rules/</code> auto-load mechanism, and <code>~/.claude/CLAUDE.md</code> is empty, so nothing pulls these files into context on its own. Each rule reaches context <strong>only</strong> when a hook injects it — so a rule costs <strong>zero tokens</strong> until its trigger fires. Mechanically this is identical to <a href="#context-context"><code>context/</code></a>; the difference is intent (a standing convention vs. an occasional fragment), not loading. The frontmatter is read by the <em>hooks</em>, not by Claude Code: <code>perl.md</code>'s <code>paths:</code> patterns are the live matcher (see below), while <code>git.md</code>'s <code>globs:</code> are inert — its gate is hardcoded in the <code>settings.json</code> <code>SessionStart</code> command.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+<th>Token use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#appendix-rules-git-md"><code>git.md</code></a></td>
+<td>Git rules — never commit on the user's behalf; concise commit messages with no AI attribution footers. Injected at SessionStart when the working directory is under <code>~/repos/</code> or <code>~/src/git/</code>.</td>
+<td>0 until in a repo</td>
+</tr>
+<tr>
+<td><a href="#appendix-rules-perl-md"><code>perl.md</code></a></td>
+<td>Perl coding conventions — operator, comma, and call spacing; brace style; subroutine placement and ordering (alpha, public then private); positional-parameter validation order; comment and Changes-entry capitalization; and Changes-file update position. Injected before Claude reads a file matching the <code>paths:</code> patterns in its frontmatter.</td>
+<td>0 until you open Perl</td>
+</tr>
+<tr>
+<td><a href="#appendix-rules-dev-guardrail-md"><code>dev-guardrail.md</code></a></td>
+<td>Dev-environment guardrail for production-adjacent hosts. Not injected context — it is the host-pattern source and documentation for the <code>guard-dev-env.sh</code> <code>PreToolUse(Bash)</code> hook, which mechanically blocks Bash on matching hosts (<company-host>) unless all three dev signals (<code>&lt;DEV_FLAG&gt;</code>, <code>$&lt;COMPANY&gt;::Config::&lt;COMPANY_ENV&gt;</code>, MySQL <code>@@hostname =~ /^&lt;dev-db&gt;/</code>) confirm dev.</td>
+<td>0 always (never enters context)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="how-rules-load">How rules load</h3>
+<p>Rules are loaded through exactly <strong>one</strong> <em>automatic</em> channel: <strong>hooks</strong> (see <a href="#hooks">Hooks</a> above). There is no unconditional load — a rule enters context only when its hook fires, and costs nothing otherwise. (You can always load one manually by asking Claude to read the file directly — a deliberate override that bypasses the hook, just like a flat-file skill.) Easy to verify: in a session where you haven't opened a Perl file, <code>perl.md</code> is not in context at all.</p>
+<h4 id="gitmd-sessionstart-hook">git.md — SessionStart hook</h4>
+<p>Git rules apply to every git operation, not just file reads, so they need session-wide scope. The <code>SessionStart</code> hook (defined in <code>~/.claude/settings.json</code>) is their sole loader: it injects <code>git.md</code> whenever the working directory is under <code>$HOME/repos/</code> or <code>$HOME/src/git/</code>, and nothing loads it elsewhere. The <code>globs:</code> frontmatter in <code>git.md</code> is decorative — the actual gate is the hardcoded <code>case</code> test in the hook command.</p>
+<h4 id="perlmd-pretooluse-hook-on-read">perl.md — PreToolUse hook on Read</h4>
+<p><code>perl.md</code> is injected on demand: a <code>PreToolUse</code> hook on <code>Read</code> fires <a href="#appendix-hooks-inject-perl-rules-sh"><code>inject-perl-rules.sh</code></a> whenever Claude is about to read a file. The script extracts the <code>paths:</code> patterns from <code>perl.md</code>'s YAML frontmatter, converts them to regexes, and checks whether the file path matches. On match, it injects the rule content as <code>additionalContext</code> <em>before</em> the read completes — so Perl conventions are in context when Claude processes the file.</p>
+<p>The <code>paths:</code> frontmatter in <code>perl.md</code> is the single source of truth for which files trigger the Perl rules. Update that file to adjust matching — no need to touch the script.</p>
+<h4 id="dev-guardrailmd-pretoolusebash-guard-hostname-gated-zero-token">dev-guardrail.md — PreToolUse(Bash) guard (hostname-gated, zero-token)</h4>
+<p>The dev guardrail is host- and directory-scoped and, unlike <code>git.md</code>/<code>perl.md</code>, it is <strong>never injected into context</strong> — it is a mechanical gate, not a load. A <code>PreToolUse</code> hook on <code>Bash</code> runs <a href="#appendix-hooks-guard-dev-env-sh"><code>guard-dev-env.sh</code></a>, which arms only when <strong>both</strong> the working directory is under <code>~/src/git</code> <strong>and</strong> the system hostname (<code>hostname -f</code>, falling back to <code>hostname</code>) matches the <code>hosts:</code> globs in <code>dev-guardrail.md</code> — any host under <code>&lt;company-host&gt;</code>. When armed it verifies all three dev signals (<code>&lt;DEV_FLAG&gt;</code>, <code>$&lt;COMPANY&gt;::Config::&lt;COMPANY_ENV&gt;</code>, and the authoritative MySQL <code>@@hostname =~ /^&lt;dev-db&gt;/</code>) and <strong>blocks the command</strong> (exit 2, with a reason Claude Code surfaces) whenever the environment is not dev — failing <strong>closed</strong> if the check itself errors.</p>
+<p>The hook runs before <em>every</em> Bash call (that is what lets it block a command, which a one-time <code>SessionStart</code> hook cannot do), but it is cheap when it does not apply: the cwd gate is checked first, so outside <code>~/src/git</code> it exits before even calling <code>hostname</code>, and on a non-matching host it exits right after — no DB connect, no tokens, sub-millisecond. On the allow path it emits nothing, so it costs <strong>zero model tokens</strong> every turn (the reason it replaced an earlier SessionStart injection, whose ~450 resident tokens were re-billed on every 5-minute cache lapse in long sessions). To keep the armed path fast without trusting <code>/tmp</code> blindly: <code>&lt;DEV_FLAG&gt;</code> (a free env var) is re-checked on every armed call, while only the expensive <code>&lt;COMPANY_ENV&gt;</code> + MySQL check is memoized — in a per-session flag with a 5-minute TTL, written only when a real <code>session_id</code> is present — so a stale flag can never grant false safety. Like <code>perl.md</code>'s <code>paths:</code>, the <code>hosts:</code> frontmatter is the single source of truth — edit the rule file to change which hosts trigger it, no script change needed.</p>
+<h2 id="skills-skills">Skills (<code>skills/</code>)</h2>
+<p>Skills are reusable slash-command workflows that teach Claude how to perform specific multi-step tasks. Think of them as mini playbooks — each one encodes a procedure (with steps, decision points, and conventions) that Claude follows when invoked. They're symlinked to <code>~/.claude/skills/</code>.</p>
+<p><strong>When to use a skill vs. a rule vs. a hook:</strong></p>
+<ul>
+<li><strong>Rule</strong> — a <em>standing constraint</em> you want applied every turn (e.g. "never commit", "use this brace style"). Rules shape <em>how</em> Claude works.</li>
+<li><strong>Hook</strong> — an <em>event-driven automation</em> that fires at lifecycle points. Hooks inject <em>context</em> or <em>gate</em> tool use automatically.</li>
+<li><strong>Skill</strong> — a <em>named workflow</em> you invoke on demand (e.g. "/create-plan"). Skills teach Claude <em>what to do</em> for a specific job.</li>
+</ul>
+<p><strong>Why skills are useful:</strong></p>
+<ul>
+<li><strong>Consistency</strong> — the same procedure runs the same way every time, regardless of which model or session is active.</li>
+<li><strong>Knowledge capture</strong> — you encode your preferred approach once and reuse it. No need to re-explain "how I like to do X" each session.</li>
+<li><strong>Delegation</strong> — skills turn complex multi-step tasks into a single <code>/command</code>. Hand off planning, code review, or deployment workflows without micromanaging.</li>
+</ul>
+<p>Two layouts, chosen by token cost:</p>
+<ul>
+<li><strong>Flat file</strong> (<code>skills/foo.md</code>) — manual load only. You tell the AI to read it; it's used once, then gone. <strong>Zero ongoing token cost.</strong></li>
+<li><strong>Directory with <code>SKILL.md</code></strong> (<code>skills/foo/SKILL.md</code>) — session auto-load. Registered as a slash command (<code>/foo</code>), loaded into context at session start and <strong>stays there every turn</strong>, consuming tokens whether used or not.</li>
+</ul>
+<p><strong>Choosing a layout:</strong> Use flat files for specialized or infrequent workflows (incident response, one-off migrations). Reserve directory-based skills for commands you reach for daily — the token cost of always-on context is worth it when the workflow is a core part of your routine.</p>
+<p><strong>Magic-phrase auto-load (a third option):</strong> Pair a flat-file skill with the <code>UserPromptSubmit</code> dispatcher (<a href="#appendix-hooks-inject-on-phrase-sh"><code>inject-on-phrase.sh</code></a>) that watches for an exact trigger phrase, and it auto-injects on demand — no slash command, no always-on cost. <code>create-plan.md</code> does this: typing <code>CREATE A PLAN</code> injects the whole skill for that turn (anywhere — no repo gate), and nothing loads otherwise. Best of both layouts — zero idle tokens like a flat file, a passive trigger like a directory skill — but you opt in with a deliberate phrase. See <a href="#phrase-commands">Phrase commands</a> for all of them.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>File</th>
+<th>Method</th>
+<th>Token use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Create structured plans with task tracking</td>
+<td><a href="#appendix-skills-create-plan-md"><code>create-plan.md</code></a></td>
+<td>Manual, or auto-injected on <code>CREATE A PLAN</code> (<code>UserPromptSubmit</code>)</td>
+<td>Zero unless triggered</td>
+</tr>
+<tr>
+<td>Follow a setup doc step-by-step on a clean target</td>
+<td><a href="#appendix-skills-implement-from-instruction-file-md"><code>implement-from-instruction-file.md</code></a></td>
+<td>Manual</td>
+<td>Zero once read</td>
+</tr>
+<tr>
+<td>Sync changes to a remote host for testing</td>
+<td><a href="#appendix-skills-remote-code-sync-md"><code>remote-code-sync.md</code></a></td>
+<td>Manual</td>
+<td>Zero once read</td>
+</tr>
+<tr>
+<td>Debate a decision with another looping LLM</td>
+<td><a href="#appendix-skills-debate-md"><code>debate.md</code></a></td>
+<td>Manual, or auto-injected on <code>PREPARE DEBATE</code> (<code>UserPromptSubmit</code>)</td>
+<td>Zero unless triggered</td>
+</tr>
+</tbody>
+</table>
+<h2 id="context-context">Context (<code>context/</code>)</h2>
+<p>Context fragments are like rules: <strong>neither is auto-loaded</strong>, and both cost <strong>zero tokens</strong> until a hook injects them on a precise trigger — mechanically identical (see <a href="#how-rules-load">How rules load</a>). The difference is <em>intent</em>, not loading: a rule encodes a standing convention, a fragment a block of guidance valuable occasionally but not worth paying for on every turn.</p>
+<p><code>context/</code> is symlinked to <code>~/.claude/context/</code> (so it's visible alongside the other dirs), but Claude never loads the directory on its own — the only thing that surfaces a fragment is a hook that reads it and emits it as <code>additionalContext</code>.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Injected by</th>
+<th>When</th>
+<th>Token use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#appendix-context-recommend-md"><code>recommend.md</code></a></td>
+<td><code>inject-on-phrase.sh</code> (<code>UserPromptSubmit</code> dispatcher)</td>
+<td>cwd is under <code>~/repos/</code>/<code>~/src/git/</code> <strong>and</strong> the prompt contains the exact phrase <code>RECOMMEND TO ME</code></td>
+<td>0 until you type it in a repo</td>
+</tr>
+</tbody>
+</table>
+<h3 id="recommendmd-the-recommendation-framework">recommend.md — the recommendation framework</h3>
+<p>When triggered, it makes Claude answer a recommendation request through these angles — author intent (inferred from code), least astonishment (user expectation), current behaviour, the with-documentation recommendation, and the without-documentation recommendation — then synthesise where they disagree and give one verdict.</p>
+<p>The trigger is deliberately an exact, case-sensitive, all-caps phrase (<code>RECOMMEND TO ME</code>) so it never fires by accident. The <code>TABLE</code> in <a href="#appendix-hooks-inject-on-phrase-sh"><code>inject-on-phrase.sh</code></a> is the single source of truth for the phrase, its target file, and the repo-gate — edit that one row to change the magic words.</p>
+<h2 id="instructions-instructions">Instructions (<code>instructions/</code>)</h2>
+<p>Instructions provide the base system prompt and are loaded into every Claude Code session.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+<th>Token use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CLAUDE.md</code></td>
+<td>System-level instructions for Claude Code. Currently an empty stub — symlinked to <code>~/.claude/CLAUDE.md</code>. Populate this file with project-wide context, conventions, and preferences that should apply to every session.</td>
+<td>Every session (~0, empty)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="ansible-integration">Ansible Integration</h2>
+<p>This repo coordinates with the Ansible configuration in <code>~/repos/devops/ansible/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Location</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consolidated playbook</td>
+<td><code>~/repos/devops/ansible/site.yml</code></td>
+<td>Single-command provisioning (all hosts, by category, per-role). Tagged for granular control.</td>
+</tr>
+<tr>
+<td>SOPS secrets</td>
+<td><code>~/repos/devops/README-SOPS-ENCRYPTION.md</code></td>
+<td>Comprehensive guide to encrypted secrets management, age key generation, Ansible deployment, key rotation, recovery.</td>
+</tr>
+<tr>
+<td>Secrets role</td>
+<td><code>~/repos/devops/ansible/roles/config/secrets/</code></td>
+<td>Generates age keypairs on targets, decrypts and deploys encrypted API credentials and SSH keys.</td>
+</tr>
+<tr>
+<td>Encrypted files</td>
+<td><code>~/repos/config/secrets/{api,ssh}/</code></td>
+<td>Encrypted credential files (twilio/cloudflare/godaddy JSON, github/ansible RSA keys, Claude Code OAuth token). Deployed by Ansible.</td>
+</tr>
+<tr>
+<td>Claude AI install</td>
+<td><code>~/repos/devops/ansible/roles/install/claude-ai/</code></td>
+<td>Installs the Claude Code CLI via the official install script (<code>curl -fsSL https://claude.ai/install.sh \| bash</code>).</td>
+</tr>
+<tr>
+<td>Claude AI config</td>
+<td><code>~/repos/devops/ansible/roles/config/claude-ai/</code></td>
+<td>Symlinks this repo's <code>AI/</code> contents (<code>hooks/</code>, <code>skills/</code>, <code>rules/</code>, <code>context/</code>, <code>settings.json</code>, <code>CLAUDE.md</code>) into <code>~/.claude/</code>, sources <code>~/.claude/oauth.env</code> from <code>~/.bash_profile</code> and <code>~/.bashrc</code> (sets <code>CLAUDE_CODE_OAUTH_TOKEN</code> for headless auth in both login and non-login shells), marks onboarding complete in <code>~/.claude.json</code> (skips the first-run TUI wizard), and adds a <code>claude-ds</code> wrapper for routing Claude through a DeepSeek API backend.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="deploying">Deploying</h3>
+<p>Runs from the Ansible repo; its <code>ansible.cfg</code> preconfigures the inventory, so no <code>-i</code> is needed. <strong>Commit and push this repo first</strong> — config roles deploy from the <em>target's</em> clone of <code>master</code> (refreshed by the <code>repos</code> role), never your local working tree.</p>
+<pre><code class="language-bash">cd ~/repos/devops/ansible
+
+# Full provision of one host (always correct — runs every role)
+ansible-playbook site.yml -l rpi1.hellbent.app
+
+# Scoped to the Claude setup: `repos` refreshes the target's clone (so new hook
+# scripts and context/ files arrive), `claude` does the CLI install + ~/.claude
+# symlinks, `core-packages` installs jq (required by the hooks):
+ansible-playbook site.yml --tags repos,claude,core-packages -l rpi1.hellbent.app
+
+# Preview only, change nothing:
+ansible-playbook site.yml --tags repos,claude,core-packages -l rpi1.hellbent.app --check --diff
+</code></pre>
+<p>Drop <code>-l &lt;host&gt;</code> to target all hosts; <code>ansible-playbook site.yml --list-tags</code> lists every tag. The Ansible repo's own <code>README.md</code> carries the full run/tag reference and this push-first caveat in detail.</p>
+<h3 id="working-on-ansible">Working on Ansible</h3>
+<p>When editing Ansible files in <code>~/repos/devops/ansible/</code>:</p>
+<ul>
+<li><strong>Playbook syntax:</strong> <code>ansible-playbook site.yml --syntax-check</code></li>
+<li><strong>Lint (production profile):</strong> <code>ansible-lint</code> from repo root</li>
+<li><strong>Tag workflow:</strong> Use <code>--tags</code> to target specific roles or categories (install, config, git, secrets, etc.)</li>
+<li><strong>Live validation:</strong> Run on Lima test VM (<code>ubuntu-test</code> in hosts inventory) before deploying to production</li>
+</ul>
+<h3 id="sopsage-secrets-in-ansible-context">SOPS+age secrets in Ansible context</h3>
+<p>Encrypted secrets are managed by the <code>config/secrets</code> Ansible role:</p>
+<ol>
+<li><strong>Target setup:</strong> role generates age keypair on target if missing</li>
+<li><strong>Decryption:</strong> sops decrypts files on target using target's own age key</li>
+<li><strong>Deployment:</strong> decrypted credentials written to <code>~/</code> and <code>~/.ssh/</code> with correct permissions</li>
+</ol>
+<p>For multi-machine setup, public keys are listed in <code>~/repos/config/.sops.yaml</code> so any authorized machine can decrypt. See <code>~/repos/devops/README-SOPS-ENCRYPTION.md</code> for the full workflow (key generation, adding machines, rotation, recovery).</p>
+<h3 id="headless-claude-code-authentication">Headless Claude Code authentication</h3>
+<p>Headless Ansible hosts can't use the interactive browser <code>/login</code>, so Claude Code authenticates with a long-lived token from <code>claude setup-token</code> (valid ~1 year), exposed via the <code>CLAUDE_CODE_OAUTH_TOKEN</code> environment variable:</p>
+<ol>
+<li><strong>Mint once</strong> — run <code>claude setup-token</code> and capture the printed token into <code>~/.claude/oauth.env</code> as <code>export CLAUDE_CODE_OAUTH_TOKEN=...</code> (<code>0600</code>). <code>setup-token</code> only prints the token; it does not install it.</li>
+<li><strong>Encrypt</strong> — SOPS-encrypt it to <code>~/repos/config/secrets/api/claude_oauth.env.enc</code> (same age recipients as the other secrets).</li>
+<li><strong>Deploy</strong> — <code>config/secrets</code> decrypts it to <code>~/.claude/oauth.env</code>; <code>config/claude-ai</code> sources that file from both <code>~/.bash_profile</code> (login shells) and <code>~/.bashrc</code> (non-login interactive shells, e.g. tmux panes), so the token is set in every terminal and <code>claude</code> skips the login prompt.</li>
+</ol>
+<p>Re-mint and re-encrypt when the token expires (~yearly). Minting tip: the OAuth URL truncates when copied from a wrapping terminal — open it from the Mac with <code>open -a Safari '&lt;url&gt;'</code>, and include the token's trailing wrapped characters (a run of <code>A</code>s is base64 padding).</p>
+<p>Separately, the interactive TUI runs a first-run onboarding wizard (theme → login) gated on <code>~/.claude.json</code>, <em>independent</em> of the token — so even when authenticated it can prompt "select login method". <code>config/claude-ai</code> sets <code>hasCompletedOnboarding: true</code> and a default <code>theme</code> in that file to skip it. The keys are <strong>merged</strong>, not symlinked: claude rewrites <code>~/.claude.json</code> on every run and it holds per-machine state (userID, project paths), so unlike <code>settings.json</code> it must never be a symlink into the repo.</p>
+<h2 id="manual-setup-on-a-foreign-non-ansible-machine">Manual setup on a foreign (non-Ansible) machine</h2>
+<p>When a host can't be reached by Ansible (not in inventory, or no SSH path from the controller) but already has this repo cloned at <code>~/repos/config</code>, you can reproduce what the <a href="#ansible-integration"><code>install/claude-ai</code> and <code>config/claude-ai</code></a> roles do entirely by hand. It reduces to four things: install the CLI, symlink <code>AI/</code> into <code>~/.claude/</code>, drop in the OAuth token, and add a few shell-rc lines.</p>
+<p><strong>Prerequisites on the target:</strong> the <code>~/repos/config</code> clone (the symlink sources), <code>curl</code> (the installer's only hard dependency), and <code>jq</code> (the git-rules <code>SessionStart</code> hook needs it — install via the system package manager). No node/npm; the CLI is a native binary.</p>
+<p><strong>1. Install the CLI</strong> — installs to <code>~/.local/bin/claude</code>:</p>
+<pre><code class="language-bash">curl -fsSL https://claude.ai/install.sh | bash
+</code></pre>
+<p><strong>2. Symlink <code>AI/</code> into <code>~/.claude/</code>.</strong> <code>ln -sfn</code> reproduces the roles' <code>state: link, force: true</code> and is safe to re-run:</p>
+<pre><code class="language-bash">mkdir -p ~/.claude
+ln -sfn ~/repos/config/AI/hooks                  ~/.claude/hooks
+ln -sfn ~/repos/config/AI/settings.json          ~/.claude/settings.json
+ln -sfn ~/repos/config/AI/skills                 ~/.claude/skills
+ln -sfn ~/repos/config/AI/rules                  ~/.claude/rules
+ln -sfn ~/repos/config/AI/context                ~/.claude/context
+ln -sfn ~/repos/config/AI/instructions/CLAUDE.md ~/.claude/CLAUDE.md
+</code></pre>
+<p><strong>3. Install the OAuth token (Option A — reuse the existing encrypted token).</strong> The target can't decrypt the SOPS secret unless its own age key is an authorized recipient, so instead decrypt on a machine that <em>is</em> one (e.g. the Mac controller) and carry the plaintext over. On the authorized machine:</p>
+<pre><code class="language-bash">SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt \
+  sops -d ~/repos/config/secrets/api/claude_oauth.env.enc
+</code></pre>
+<p>Copy that output — a single <code>export CLAUDE_CODE_OAUTH_TOKEN=…</code> line — into <code>~/.claude/oauth.env</code> on the target, then lock it down:</p>
+<pre><code class="language-bash">chmod 600 ~/.claude/oauth.env
+</code></pre>
+<p>The encrypted file already ships in the target's <code>~/repos/config</code> clone; Option A just sidesteps having to authorize the target's own key in <code>.sops.yaml</code> and re-encrypt (the full path, in <a href="#sopsage-secrets-in-ansible-context">SOPS+age secrets</a>). To mint a fresh, independent token instead, run <code>claude setup-token</code> on the target — see <a href="#headless-claude-code-authentication">Headless Claude Code authentication</a>.</p>
+<p><strong>4. Add the shell-rc lines</strong> to <strong>both</strong> <code>~/.bash_profile</code> (login shells) and <code>~/.bashrc</code> (non-login interactive, e.g. tmux panes):</p>
+<pre><code class="language-bash">export PATH=&quot;$HOME/.local/bin:$PATH&quot;
+[ -r ~/.claude/oauth.env ] &amp;&amp; . ~/.claude/oauth.env
+</code></pre>
+<p>The PATH line matters: a managed <code>~/.bash_profile</code> shadows <code>~/.profile</code>, which is what normally puts <code>~/.local/bin</code> on PATH, so without it <code>claude</code> isn't found.</p>
+<p><strong>5. Skip the first-run wizard</strong> — merge two keys into <code>~/.claude.json</code> (never symlink this file: claude rewrites it constantly and it holds per-machine state):</p>
+<pre><code class="language-bash">python3 - &lt;&lt;'EOF'
+import json, os
+p = os.path.expanduser('~/.claude.json')
+d = json.load(open(p)) if os.path.exists(p) else {}
+d['hasCompletedOnboarding'] = True
+d['theme'] = d.get('theme') or 'dark'
+json.dump(d, open(p, 'w'), indent=2)
+EOF
+</code></pre>
+<p><strong>Verify:</strong></p>
+<pre><code class="language-bash">source ~/.bash_profile
+which claude &amp;&amp; claude --version
+[ -n &quot;$CLAUDE_CODE_OAUTH_TOKEN&quot; ] &amp;&amp; echo &quot;token loaded&quot;
+claude   # starts already authed, no first-run wizard
+</code></pre>
+<h2 id="backing-up-claude">Backing up Claude</h2>
+<p>These items are symlinked into <code>~/.claude/</code> from this repo, so committing and pushing backs them up:</p>
+<ul>
+<li><strong><code>instructions/CLAUDE.md</code></strong> → <code>~/.claude/CLAUDE.md</code></li>
+<li><strong><code>rules/</code></strong> → <code>~/.claude/rules/</code></li>
+<li><strong><code>skills/</code></strong> → <code>~/.claude/skills/</code></li>
+<li><strong><code>hooks/</code></strong> → <code>~/.claude/hooks/</code></li>
+<li><strong><code>context/</code></strong> → <code>~/.claude/context/</code></li>
+<li><strong><code>settings.json</code></strong> → <code>~/.claude/settings.json</code></li>
+</ul>
+<p>Beyond the symlinks, only a few real files in <code>~/.claude/</code> are worth saving:</p>
+<ul>
+<li><strong><code>keybindings.json</code></strong> — custom key bindings (if used).</li>
+<li><strong><code>projects/</code></strong> — chat transcripts and learned memory.</li>
+<li><strong><code>plans/</code>, <code>tasks/</code></strong> — only if you use those features.</li>
+</ul>
+<p>Skip the rest (<code>cache/</code>, <code>sessions/</code>, <code>session-env/</code>, <code>shell-snapshots/</code>, <code>file-history/</code>, <code>telemetry/</code>, <code>daemon*</code>, <code>plugins/</code>) — it regenerates.</p>
+<hr>
+<p>Licensed under the <a href="https://www.perlfoundation.org/artistic-license-20.html">Artistic License 2.0</a>. © 2026 Steve Bertrand.</p>
+<h2 id="appendix-bundled-resource-files">Appendix: bundled resource files</h2>
+<p>Every relative link above resolves here. Each rules / skills / hooks / context file and <code>settings.json</code> is embedded verbatim so this document is fully self-contained — no access to the source repo required. Cross-references between these files point to their sections below.</p>
+<p><a id="appendix-settings-json"></a></p>
+<h3 id="settingsjson">settings.json</h3>
+<pre><code class="language-json">{
+  &quot;model&quot;: &quot;opus&quot;,
+  &quot;hooks&quot;: {
+    &quot;PreToolUse&quot;: [
+      {
+        &quot;matcher&quot;: &quot;Read&quot;,
+        &quot;hooks&quot;: [
+          {
+            &quot;type&quot;: &quot;command&quot;,
+            &quot;command&quot;: &quot;\&quot;$HOME/.claude/hooks/inject-perl-rules.sh\&quot;&quot;
+          }
+        ]
+      },
+      {
+        &quot;matcher&quot;: &quot;Bash&quot;,
+        &quot;hooks&quot;: [
+          {
+            &quot;type&quot;: &quot;command&quot;,
+            &quot;command&quot;: &quot;\&quot;$HOME/.claude/hooks/guard-dev-env.sh\&quot;&quot;
+          }
+        ]
+      }
+    ],
+    &quot;SessionStart&quot;: [
+      {
+        &quot;hooks&quot;: [
+          {
+            &quot;type&quot;: &quot;command&quot;,
+            &quot;command&quot;: &quot;d=\&quot;${CLAUDE_PROJECT_DIR:-$PWD}\&quot;; case \&quot;$d/\&quot; in \&quot;$HOME/repos/\&quot;*|\&quot;$HOME/src/git/\&quot;*) command -v jq &gt;/dev/null 2&gt;&amp;1 || { echo \&quot;SessionStart git.md hook: jq not installed; git rules NOT loaded\&quot; &gt;&amp;2; exit 2; }; [ -r \&quot;$HOME/.claude/rules/git.md\&quot; ] || { echo \&quot;SessionStart git.md hook: git.md not readable; git rules NOT loaded\&quot; &gt;&amp;2; exit 2; }; jq -Rs '{hookSpecificOutput:{hookEventName:\&quot;SessionStart\&quot;,additionalContext:.}}' \&quot;$HOME/repos/config/AI/rules/git.md\&quot; ;; esac&quot;
+          }
+        ]
+      }
+    ],
+    &quot;UserPromptSubmit&quot;: [
+      {
+        &quot;hooks&quot;: [
+          {
+            &quot;type&quot;: &quot;command&quot;,
+            &quot;command&quot;: &quot;\&quot;$HOME/.claude/hooks/inject-on-phrase.sh\&quot;&quot;
+          }
+        ]
+      }
+    ]
+  },
+  &quot;theme&quot;: &quot;light&quot;,
+  &quot;skipAutoPermissionPrompt&quot;: true
+}
+</code></pre>
+<p><a id="appendix-rules-git-md"></a></p>
+<h3 id="rulesgitmd">rules/git.md</h3>
+<pre><code class="language-markdown">---
+globs:
+  - &quot;**/repos/**/*&quot;
+  - &quot;**/src/git/**/*&quot;
+---
+
+# Git Rules
+
+Follow these rules for ALL git operations.
+
+## Never commit on the user's behalf
+
+The user always does their own git commits. **Never run `git commit`.** Proposing a commit message is fine — executing the commit is not.
+
+**Why:** the user prefers to review and commit manually.
+
+## Commit messages
+
+When asked for a commit message:
+
+- Keep it **concise** — single line ≤72 chars where possible. Add a second line + body only if the change genuinely needs it.
+- **NEVER include `Co-Authored-By:` footers**, generation watermarks (e.g. &quot;🤖 Generated with...&quot;), or any mention of Claude, AI, assistant, or Anthropic. The commit is the user's; AI attribution is unwanted.
+- This overrides any default Claude Code commit-message conventions.
+
+---
+
+Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
+</code></pre>
+<p><a id="appendix-rules-perl-md"></a></p>
+<h3 id="rulesperlmd">rules/perl.md</h3>
+<pre><code class="language-markdown">---
+paths:
+  - &quot;lib/**/*.{pl,pm}&quot;
+  - &quot;t/**/*.t&quot;
+  - &quot;lib/**/*.pod&quot;
+  - &quot;*.pl&quot;
+  - &quot;test.pl&quot;
+  - &quot;scripts/*.pl&quot;
+  - &quot;Makefile.PL&quot;
+  - &quot;Build.PL&quot;
+---
+
+# Perl Coding Rules
+
+Follow these rules for ALL Perl code generation.
+
+## Spacing &amp; Operators
+
+**Always put a space AFTER negation operators.**
+
+CORRECT:
+
+```perl
+if (! $valid) { }
+if (not $valid) { }
+while (! $done) { }
+$flag = ! $enabled;
+```
+
+INCORRECT:
+
+```perl
+if (!$valid) { }
+if (not$valid) { }
+while (!$done) { }
+$flag = !$enabled;
+```
+
+**Put spaces around binary operators.**
+
+CORRECT:
+
+```perl
+my $sum = $a + $b;
+my $diff = $x - $y;
+my $product = $qty * $price;
+```
+
+INCORRECT:
+
+```perl
+my $sum=$a+$b;
+my $diff=$x-$y;
+my $product=$qty*$price;
+```
+
+## Blocks &amp; Braces
+
+**Opening brace on same line as keyword. Closing brace aligns with keyword.**
+
+CORRECT:
+
+```perl
+sub validate_user {
+    my ($user) = @_;
+
+    if (! $user-&gt;name) {
+        return 0;
+    }
+
+    return 1;
+}
+
+if ($x) {
+    x();
+}
+else {
+    y()
+}
+```
+
+INCORRECT:
+
+```perl
+sub validate_user
+{
+    my ($user) = @_;
+    if (! $user-&gt;name)
+        {
+        return 0;
+        }
+    return 1;
+}
+```
+
+INCORRECT:
+
+```perl
+if ($x) {
+    x();
+} else {
+    y()
+}
+```
+
+## Updates to Changes file go at the bottom of the current section
+
+**When updating Changes file, changes go at the bottom of the current section**
+
+BEFORE any changes:
+
+```
+1.14 UNREL
+    - Entry 1
+    - Entry 2
+```
+
+AFTER change (CORRECT - new rule at bottom):
+
+```
+1.14 UNREL
+    - Entry 1
+    - Entry 2
+    - New entry
+```
+
+AFTER change (INCORRECT - new rule inserted in middle):
+
+```
+1.14 UNREL
+    - New entry
+    - Entry 1
+    - Entry 2
+```
+
+## Changes entries start with a capital letter
+
+**Each Changes file entry begins with a capital letter when appropriate.**
+
+Do NOT force capitalization where it would be wrong — leave case-sensitive
+identifiers, function names, filenames, etc. as-is.
+
+CORRECT:
+
+```
+    - Fixed crash in read_config()
+    - Added support for IPv6 addresses
+    - Updated dependencies
+```
+
+INCORRECT:
+
+```
+    - fixed crash in read_config()
+    - added support for IPv6 addresses
+    - updated dependencies
+```
+
+## In-code comments start with a capital letter
+
+**Begin in-code comments with a capital letter when appropriate.**
+
+Do NOT capitalize where it would be wrong — leave case-sensitive identifiers,
+variable names, function names, etc. as-is.
+
+CORRECT:
+
+```perl
+# Validate the user before continuing
+# $filepath must be an absolute path
+```
+
+INCORRECT:
+
+```perl
+# validate the user before continuing
+# the user must be valid
+```
+
+## Subroutine Calls - No Space Before Parenthesis
+
+CORRECT:
+
+```perl
+my $result = x($arg1, $arg2);
+my $length = y($string);
+print &quot;Hello\n&quot;;
+```
+
+INCORRECT:
+
+```perl
+my $result = x ($arg1, $arg2);
+my $length = y ($string);
+```
+
+## Comma Spacing
+
+**Space AFTER each comma, NEVER before.**
+
+CORRECT:
+
+```perl
+my @list = (1, 2, 3, 4);
+my %hash = (name =&gt; 'Bob', age =&gt; 30);
+my_sub($foo, $bar, $baz);
+```
+
+INCORRECT:
+
+```perl
+my @list = (1,2,3,4);
+my @list = (1 ,2 ,3 ,4);
+my_sub($foo , $bar , $baz);
+```
+
+## Subroutines always go after executable code in scripts
+
+```perl
+#!/usr/bin/env perl
+
+use warnings;
+use strict;
+use feature 'say';
+
+my $user = { name =&gt; 'Alice', email =&gt; 'alice@example.com', age =&gt; 30 };
+say validate_user($user) ? 'Valid' : 'Invalid';
+
+# SUBROUTINES ALWAYS BELONG AFTER THE EXECUTABLE CODE IN SCRIPTS
+sub validate_user {
+    my ($user) = @_;
+
+    if (! $user-&gt;{name}) {
+        warn &quot;User has no name\n&quot;;
+        return 0;
+    }
+
+    if (! $user-&gt;{email}) {
+        warn &quot;User has no email\n&quot;;
+        return 0;
+    }
+
+    if (! $user-&gt;{age}) {
+        warn &quot;User has no age\n&quot;;
+        return 0;
+    }
+
+    return 1;
+}
+```
+
+## Subroutines are created in an alphabetical order (alpha public, alpha private)
+
+```perl
+# ALWAYS SEPARATE PUBLIC AND PRIVATE, AND ALPHABETICALIZE
+
+sub one {
+    ...
+}
+sub three {
+    ...
+}
+sub two {
+    ...
+}
+
+sub _one_helper {
+    ...
+}
+sub _three_helper {
+    ...
+}
+sub _two_helper {
+    ...
+}
+```
+
+## Positional parameters get validated in the order they are received
+
+```perl
+#!/usr/bin/env perl
+
+use warnings;
+use strict;
+
+use Carp qw(croak);
+
+sub read_config {
+    my ($filepath, $x) = @_;
+
+    # POSITIONAL PARAMETERS GET VALIDATED IN ORDER THEY ARE RECEIVED
+    if (! defined $filepath) {
+        croak &quot;read_config() requires the \$filepath param&quot;;
+    }
+
+    if (! defined $x || $x !~ /^\d+$/) {
+        croak &quot;read_config() requires \$x param, and it must be an integer&quot;;
+    }
+}
+```
+
+---
+
+Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
+</code></pre>
+<p><a id="appendix-rules-dev-guardrail-md"></a></p>
+<h3 id="rulesdev-guardrailmd">rules/dev-guardrail.md</h3>
+<pre><code class="language-markdown">---
+hosts:
+  - &quot;*&lt;company-host&gt;*&quot;
+  - &quot;*&lt;company-host&gt;*&quot;
+  - &quot;*&lt;company-host&gt;*&quot;
+  - &quot;*&lt;company-host&gt;*&quot;
+---
+
+# Dev-environment guardrail — production-adjacent hosts
+
+Bash work is **mechanically gated to the dev environment** when **both** conditions hold:
+
+1. the working directory is under `~/src/git`, **and**
+2. the system hostname matches the `hosts:` patterns above (&lt;COMPANY&gt; —
+   `&lt;company-host&gt;`).
+
+`dev` is the only environment we ever work in — never change it.
+
+Enforcement is a `PreToolUse` hook on `Bash`, [`guard-dev-env.sh`](../hooks/guard-dev-env.sh)
+— **not** injected context. On the allow path it emits nothing into the model's context, so
+it costs **zero tokens** per turn (a SessionStart injection, by contrast, sits in context and
+is re-billed on every 5-minute cache lapse across a long session). When armed, the hook
+verifies all three dev signals:
+
+- `$&lt;DEV_FLAG&gt;` eq `dev`
+- `$&lt;COMPANY&gt;::Config::&lt;COMPANY_ENV&gt;` eq `dev`
+- MySQL `@@hostname` matches `/^&lt;dev-db&gt;/` — authoritative, read from the server itself
+
+If any check fails the hook **blocks the command** (exit 2) and reports which signal was
+wrong, so work stops immediately when the environment is not dev. The guard fails **closed**:
+if the dev check cannot complete (e.g. perl/&lt;COMPANY&gt; error), it blocks rather than allows.
+
+The hook runs before every Bash call (that is what lets it block), but it is cheap and
+side-effect-free when it does not apply: if the cwd is not under `~/src/git` it exits before
+even checking the hostname, and on a non-matching host it exits right after — no DB connect,
+no tokens, sub-millisecond. `$&lt;DEV_FLAG&gt;` (a free env var) is re-checked on every armed call;
+only the expensive `&lt;COMPANY_ENV&gt;` + MySQL check is memoized, in a per-session `/tmp` flag with a
+**5-minute TTL**, and only when a real `session_id` is present — so a stale flag can never
+grant false safety (see the header comment in the hook).
+
+This file is no longer injected into context. It remains the single source of truth for the
+`hosts:` patterns (read by the hook) and documents the guard.
+
+---
+
+Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
+</code></pre>
+<p><a id="appendix-skills-create-plan-md"></a></p>
+<h3 id="skillscreate-planmd">skills/create-plan.md</h3>
+<pre><code class="language-markdown">---
+name: create-plan
+description: Structured project planning with stable IDs, status tracking, discovery tracking, and archive workflow. Creates and resumes plan files (validation tables, backlogs, maintenance rules) in a plans/ directory under the current working directory.
+when_to_use: When the user asks to create a plan (&quot;create a plan&quot;, &quot;create a project plan&quot;, &quot;create a plan named X&quot;), to read/resume an existing plan (&quot;read plan X&quot;), or otherwise to track tasks for a feature
+argument-hint: [plan-name]
+arguments: plan_name
+---
+
+&gt; **Precedence:** these instructions and the user's live instruction override any stored memory. If a recalled memory conflicts, follow this file / the user — memory is a default, not a constraint.
+
+# Project Planning Instructions
+
+## Rules
+
+1. **Stable IDs** — `V#` for tasks, `B#` for backlog, `F#` for review findings. Never renumber within a series — new items get the next free ID, deletions leave surviving IDs untouched, and don't rewrite cross-references to &quot;new positions&quot; after a deletion (there are no new positions; old IDs still point at the same content).
+
+2. **Status Tracking** — Table: ID, What, Command, Expected, Actual. Actual format: `✅/❌ YYYY-MM-DD attempt N: result`
+
+3. **Discovery Tracking** — `Fix N: problem discovered during VX` with what happened + fix. Keep unresolved only.
+
+4. **Top Lines** — At file top: `&gt; **NEXT ACTION:** [cmd]` and `&gt; **LAST SESSION:** [what]`. Complex plans (per Rule 8) also include `&gt; **ARCHIVE:** See $plan_name-archive.md for completed V tasks`; Simple plans omit the ARCHIVE line since they don't archive (per Rule 6).
+
+5. **Single File** — Main file holds current tasks, backlog, decisions, &quot;NOT doing&quot;.
+
+6. **Archive Strategy** — When V task ✅: move row to `$plan_name-archive.md`. Main file keeps only ⏳ or in-progress tasks + unresolved fixes.
+
+7. **Archive Pointer** — Update whenever items archived. Pointer lists ONLY what IS archived — never &quot;not yet created&quot;. Format: `for completed V1` (single), `for completed V1-V3` (contiguous range), `for completed V1, V3, V5` (non-contiguous). Non-contiguous ranges occur when tasks complete out of order (e.g., after backlog promotion or explicit prioritization).
+
+8. **Complexity Triage** — Simple (&lt;5 tasks, &lt;1 day): use rules 1, 2, 4, 5, 10 only. Complex: use all rules.
+
+9. **Inline Maintenance Block** — Any plan that uses an archive file (per Rule 6) MUST embed the &quot;Maintenance Rules Block&quot; (see below) immediately before the `## Validation Table` heading, so any AI editing the file can follow the workflow without reading this document. Replace `$plan_name` in the block with the actual plan name (kebab-case slug, no extension). Simple plans (no archive) MAY omit it.
+
+10. **One task per turn** — When told to &quot;proceed&quot;, &quot;continue&quot;, &quot;next&quot; (or equivalent), perform only the next ⏳ V task listed, then stop and wait for further instruction. Do NOT batch multiple V tasks per turn even if they look small or related, unless the user explicitly authorizes a batch (e.g., &quot;do V1-V3&quot;, &quot;knock out all the style fixes&quot;). Every plan MUST embed the &quot;Execution Rules Block&quot; (see below) immediately before the `## Validation Table` heading so this rule reaches AI editors directly — including Simple plans that skip the Maintenance Rules Block.
+
+**Plan name:** If the user gives a name, that IS the plan name — use it verbatim as a kebab-case slug. `/create-plan auth-refactor` (or &quot;create a plan named auth-refactor&quot;) means `$plan_name = &quot;auth-refactor&quot;`, plan file `auth-refactor.md`, archive file `auth-refactor-archive.md`. If the user just says &quot;create a plan&quot; / &quot;create a project plan&quot; with no name, derive a concise, descriptive kebab-case slug yourself from the plan's goal or the current task/context (e.g. a session about retry logic → `retry-logic`) — do NOT stop to ask. Never randomize or use a generic placeholder like `plan` or `untitled`; only ask the user if the goal is too vague to name sensibly.
+
+**Filename from the `CREATE A PLAN ` trigger:** Inspect what follows the magic phrase. If it carries an explicit `.md` extension (e.g. `CREATE A PLAN auth-refactor.md`), that IS the filename — use it exactly; `$plan_name` is its stem (`auth-refactor`). If there is **no** `.md` extension, you choose the filename: derive a sane, concise kebab-case slug from the following words and/or the surrounding context per the naming rules above — a clean single token can be used as-is (`CREATE A PLAN retry-logic` → `retry-logic`), a descriptive phrase should be condensed (`CREATE A PLAN fix the broken login redirect` → `login-redirect-fix`). The `.md` extension is the signal that the user is dictating an exact filename; without it, naming is yours.
+
+**CREATE A PLAN means PLAN ONLY — write the file, then STOP.** Creating a plan is a write-the-plan action, never an implement-the-plan action. After you finish writing `$plan_name.md` (research, ask any clarifying questions, and produce the plan), you **stop and wait** — do NOT begin V1, do NOT run any V-task command, do NOT make any code/config/system change the plan describes, even if the plan is approved, even if `NEXT ACTION` names a command, and even if it &quot;looks like a one-liner&quot;. Exploration and read-only research needed to *author* the plan are fine; executing the planned work is not. Implementation begins only in a later turn when the user explicitly says &quot;proceed&quot; / &quot;continue&quot; / &quot;next&quot; / &quot;go&quot; (per the Execution Rules), and even then **one V task per turn**. This is the same stop-and-wait contract as reading a plan: producing or loading a plan never causes you to &quot;just go execute&quot;.
+
+**File location:** Plans live in a `plans/` directory inside the user's current working directory:
+
+- Plan file: `plans/$plan_name.md`
+- Archive file: `plans/$plan_name-archive.md` (created later, on the first ✅ — see Archive Workflow)
+
+When creating a plan, first ensure the directory exists (`mkdir -p plans` in the CWD), then write `plans/$plan_name.md`. Elsewhere in this document, bare `$plan_name.md` / `$plan_name-archive.md` always mean these copies inside `plans/`. Because the plan and its archive are siblings in `plans/`, references *inside* the plan text (the ARCHIVE pointer, the maintenance block) stay bare filenames with no `plans/` prefix.
+
+Do NOT write plans to `~/.claude/`, `~/plans/`, `~/.claude/plans/`, or any other system/profile directory — even if it seems like a natural home. Always the CWD's `plans/` subdirectory, no exceptions.
+
+**Plan-mode exception (and required recovery).** When the harness is in *plan mode*, it overrides the above: it hard-codes the plan's path and filename (typically `~/.claude/plans/&lt;random-slug&gt;.md`) and restricts you to editing only that one file. You cannot write to the CWD's `plans/` while plan mode is active, so comply with the harness for the moment. But this placement is wrong per this skill (both the forbidden `~/.claude/plans/` location *and* the random, non-descriptive slug). So **once plan mode exits** (the plan is approved/you regain normal file access), immediately relocate it: move the file to `plans/$plan_name.md` in the CWD with a descriptive `$plan_name` derived per the naming rules, update the internal `ARCHIVE` pointer (and any other `$plan_name`-derived references) to match, and delete the stray `~/.claude/plans/` copy. Relocating the plan file is a housekeeping move, NOT executing the plan — it does not violate the &quot;PLAN ONLY, then STOP&quot; rule. Do this proactively without being asked.
+
+**Reading/resuming a plan:** When the user says `read plan 'X'` (or `read plan X`), this is a **load-and-report action only — it NEVER executes anything**.
+
+First resolve which plan they mean:
+
+- Match `X` against the **exact file stem** — open the file named exactly `X.md`. Never substring-, prefix-, or fuzzy-match: `read plan plan` looks for `plan.md` and must NOT match `exoplanet.md` just because it contains &quot;plan&quot;.
+- If the user says `read plan` with **no name**, do not guess and do not derive one (deriving a slug is create-only — you cannot invent which existing plan someone wants). List `plans/` and ask which to open; if `plans/` holds exactly one plan file, you may name it and confirm before reading.
+
+Then:
+
+1. Open `plans/X.md` (and `plans/X-archive.md` if it exists).
+2. Report the current state: `NEXT ACTION`, `LAST SESSION`, the remaining ⏳ V tasks, and any unresolved Discovery Tracking fixes.
+3. **Stop and wait.** Do NOT begin the next task — reading a plan NEVER triggers execution, even when `NEXT ACTION` names a command. A task runs only after the user, in a later turn, explicitly says &quot;proceed&quot; / &quot;continue&quot; / &quot;next&quot; / &quot;go&quot; (per the Execution Rules), and even then one task per turn. At no point does loading, reading, or resuming a plan cause you to &quot;just go execute&quot;.
+
+**If `plans/X.md` does not exist**, do NOT silently create a new plan. Instead:
+
+- Fall back to checking the CWD root for a legacy `X.md` (where plans lived before they moved into `plans/`). _Temporary: the user will retire this fallback once all plans live in `plans/`._
+- If a legacy `X.md` is found in the CWD root, ASK the user whether they meant that file before reading or acting on it — do not use it silently.
+- If nothing is found in either place, say so and list what's in `plans/`.
+
+## Archive File Format (append-only, no tables)
+
+`$plan_name-archive.md` always opens with the heading: `# Archive — completed V tasks and resolved fixes`
+
+**Empty &quot;Archived Fixes&quot; section** (use `_None yet._` placeholder while empty). Note: each entry is its own bullet (`- V#: ...`) so Markdown renders one per line:
+
+```
+# Archive — completed V tasks and resolved fixes
+
+## Archived V Tasks
+
+- V1: description — ✅ YYYY-MM-DD attempt 1: PASS
+- V2: description — ✅ YYYY-MM-DD attempt 1: PASS
+
+## Archived Fixes
+
+_None yet._
+```
+
+**After the first fix arrives** (replace `_None yet._`):
+
+```
+## Archived Fixes
+
+- Fix 3 (from V2): missing croak import — added `use Carp qw(croak)` to read_config()
+```
+
+Rules: New items append at bottom. Never renumber. Use `_None yet._` only while a section is empty; delete it as soon as the first real entry is added.
+
+## Execution Rules Block (embed in every plan)
+
+No substitutions required — embed verbatim.
+
+```
+## Execution rules
+
+- **One task per turn**: when told to proceed or continue (or &quot;next&quot;, &quot;go&quot;, etc.), perform only the next ⏳ V task listed, then stop and wait for further instruction. Do NOT batch multiple V tasks per turn unless the user explicitly authorizes a batch (e.g., &quot;do V1-V3&quot;, &quot;do all the style fixes&quot;).
+```
+
+## Maintenance Rules Block (embed in every plan that has an archive file)
+
+Replace `$plan_name` with the actual plan name (kebab-case slug, no extension).
+
+```
+## Maintenance rules
+
+- V task ✅: do all three:
+  1. Set Actual to `✅ YYYY-MM-DD attempt N: PASS`.
+  2. Append a new bullet at the bottom of $plan_name-archive.md's &quot;Archived V Tasks&quot; section: `- V#: description — ✅ YYYY-MM-DD attempt N: PASS`. One bullet per entry — never run two entries together.
+  3. **Delete the V# row from this file's Validation Table.**
+- V task ❌: update Actual with `❌ YYYY-MM-DD attempt N: reason`. Rerun same V# with attempt N+1. Do NOT create a new V#.
+- **Sync review findings** — when a V task (or a Fix) resolves a review finding, mark its `F#` entry in `## Review Findings` **in place**: prefix `✅ RESOLVED (V#)` (or `✅ VALIDATED (V#)` if no code change was needed, or `⏸ DEFERRED → B#` if punted to backlog). Findings are a permanent audit ledger of what review surfaced and where it was handled — mark in place; never archive, delete, or renumber them.
+- Update ARCHIVE pointer to reflect what's archived (e.g., `V1-V2` → `V1-V3`)
+- Update NEXT ACTION to next ⏳ row; update LAST SESSION
+- Never renumber within a series. New items get next free number.
+- **Discovery triage during V# work** — when you find something while working a V task, classify before continuing:
+  - Blocks the current V task → add `Fix N: problem discovered during V# — [what + fix]` to `## Discovery Tracking`; resolve as part of this V task's work.
+  - Real bug but doesn't block this V task → add a new V# row (next free) to the Validation Table with ⏳; do not detour to fix it now.
+  - Non-blocking improvement → add new B# to `## Backlog` (one `B#` per line, each separated by a blank line — never run two entries together, or Markdown collapses them into a single mashed paragraph).
+  - Decided not to do → add to `## Explicitly NOT doing` with a one-line justification.
+- Move resolved fixes to archive's &quot;Archived Fixes&quot; section; keep only unresolved in main Discovery Tracking
+- To promote a backlog item to an active task: assign it the next free V# (e.g., B3 becomes V4) and move to the Validation Table. The B# slot is retired and never reused.
+```
+
+## Archive Workflow Examples
+
+### Initial (no completed tasks)
+- Create `$plan_name.md` with pointer line: `&gt; **ARCHIVE:** See $plan_name-archive.md for completed V tasks`
+- Do NOT create the archive file yet.
+
+### First task completes (V1 ✅)
+1. Create `$plan_name-archive.md`:
+   ```
+   # Archive — completed V tasks and resolved fixes
+
+   ## Archived V Tasks
+
+   - V1: First task — ✅ YYYY-MM-DD attempt 1: PASS
+
+   ## Archived Fixes
+
+   _None yet._
+   ```
+2. Update pointer: `&gt; **ARCHIVE:** See $plan_name-archive.md for completed V1`
+3. Remove V1 row from main table. Update NEXT ACTION to V2.
+
+### Task fails (V2 ❌)
+- Update Actual: `❌ YYYY-MM-DD attempt 1: timeout waiting for serial socket`
+- Do NOT move anything to archive.
+- Update NEXT ACTION (still V2, attempt 2 after fix).
+- Add Discovery Tracking entry describing the problem (and the fix once known).
+
+### Subsequent task completes (V2 ✅ after retry)
+1. Append a new bullet at the bottom of archive's &quot;Archived V Tasks&quot; section: `- V2: Second task — ✅ YYYY-MM-DD attempt 2: PASS (failed attempt 1: timeout)`
+2. Update pointer: `&gt; **ARCHIVE:** See $plan_name-archive.md for completed V1-V2`
+3. Remove V2 row. Update NEXT ACTION to V3.
+
+### Promote backlog to active (B3 → V4)
+1. Assign the next free V#: `B3: improve error handling` becomes `V4: improve error handling`. The B3 slot is retired and never reused.
+2. Move row from Backlog section to Validation Table with status ⏳.
+3. Update NEXT ACTION if this is now the next pending task.
+
+## Template
+
+```
+# Plan: [Goal]
+
+&gt; **NEXT ACTION:** [command]
+&gt; **LAST SESSION:** [what completed]
+&gt; **ARCHIVE:** See $plan_name-archive.md for completed V tasks   (complex plans only)
+
+## Execution rules
+[embed Execution Rules Block from above]
+
+## Maintenance rules
+[embed Maintenance Rules Block from above]
+
+## Validation Table
+
+| ID | What | Command | Expected | Actual |
+|----|------|---------|----------|--------|
+| V1 | Task 1 | `cmd` | expected | ⏳ |
+
+## Discovery Tracking
+
+**Fix N:** Problem discovered during VX
+- What happened
+- Fix
+
+## Review Findings
+
+(Optional — include when the plan involves review passes that surface issues.) Each finding gets a stable `F#` and a `(→V#)` pointer to the task that will address it. Mark **in place** as that task closes — `✅ RESOLVED (V#)` / `✅ VALIDATED (V#)` / `⏸ DEFERRED → B#`; never archive, delete, or renumber.
+
+- **F1** (→V#): description of the issue
+
+## Backlog
+
+B1: improvement
+
+B2: another improvement
+
+## Explicitly NOT doing
+
+- rejected idea — why
+```
+
+## After Each V Task ✅
+
+1. Create archive (if first) or append (if exists)
+2. Append the V row as a new bullet at the bottom of archive's &quot;Archived V Tasks&quot; section
+3. **Delete the V row from the main file's Validation Table**
+4. Append any resolved fixes to archive's &quot;Archived Fixes&quot; section; delete them from Discovery Tracking
+5. If the task resolved any `F#` review findings, mark each **in place** in `## Review Findings`: `✅ RESOLVED (V#)` (or `✅ VALIDATED (V#)` when no code change was needed, `⏸ DEFERRED → B#` when punted). Never archive, delete, or renumber findings.
+6. Update NEXT ACTION → next ⏳
+7. Update LAST SESSION
+8. Update ARCHIVE pointer (e.g., `V1-V2` → `V1-V3`)
+
+## After Each V Task ❌
+
+1. Update Actual with `❌ YYYY-MM-DD attempt N: reason`
+2. Do NOT move anything to archive
+3. Add Discovery Tracking entry describing the problem (and the fix once known)
+4. Keep same V# for next attempt
+5. NEXT ACTION remains the same V# (attempt N+1)
+
+---
+
+Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
+</code></pre>
+<p><a id="appendix-skills-implement-from-instruction-file-md"></a></p>
+<h3 id="skillsimplement-from-instruction-filemd">skills/implement-from-instruction-file.md</h3>
+<pre><code class="language-markdown">---
+name: implement-from-instruction-file
+description: Mechanically follow a setup/install/migration doc on a clean target to actually implement what it describes; gaps in the doc surface naturally because you only do what the doc says, nothing more
+when_to_use: When the user asks to follow, execute, or implement the steps in an instruction document on a clean target — e.g. &quot;implement INSTALL.md on a fresh VM&quot;, &quot;follow ci/README.md from scratch&quot;, &quot;set up a new host from the doc&quot;
+argument-hint: [doc-path]
+---
+
+&gt; **Precedence:** these instructions and the user's live instruction override any stored memory. If a recalled memory conflicts, follow this file / the user — memory is a default, not a constraint.
+
+# Implement from instruction file
+
+**Usage:** `/implement-from-instruction-file &lt;doc-path&gt;` — or ask naturally: &quot;implement the steps in `&lt;doc&gt;` on a clean `&lt;target&gt;`.&quot;
+
+Don't validate the doc by re-reading it. &quot;I forgot I did this earlier&quot; assumptions don't surface until you mechanically follow it on a clean system.
+
+- Run on a clean target — VM, container, fresh user, whatever's available.
+- Do exactly what the doc says. No shortcuts, no prior knowledge, no off-doc fixes.
+- Don't preserve hidden state on the host. If a config, package, or `chmod` is already in place, that's the gap — leave it broken so the doc must re-create it.
+- Back up only artifacts unreproducible from the doc (operator-supplied qcow2s, secrets). Everything else returns via the doc.
+- **Record every off-script step you have to invent.** Those are the gaps; they become PRs against the doc.
+
+**Catches:** missing `apt-get install` entries; a re-login after `usermod` buried in a code-block comment (silently degrades — Lima fell back to TCG, ~10× slower); a `chmod 644 /boot/vmlinuz-*` done manually months earlier.
+
+---
+
+Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
+</code></pre>
+<p><a id="appendix-skills-remote-code-sync-md"></a></p>
+<h3 id="skillsremote-code-syncmd">skills/remote-code-sync.md</h3>
+<pre><code class="language-markdown">---
+name: remote-code-sync
+description: Sync code changes to a remote test host via rsync during iterative work; on task completion, list uncommitted files and suggest a concise commit message for the user to run themselves
+when_to_use: When the user begins iterative work on code that runs on a remote host accessed via SSH/rsync — e.g. testing fixes on a remote test box like heritage, syncing changes to a remote target, multi-attempt fix-and-test cycles where the test target isn't local
+---
+
+&gt; **Precedence:** these instructions and the user's live instruction override any stored memory. If a recalled memory conflicts, follow this file / the user — memory is a default, not a constraint.
+
+# Remote code sync
+
+**Usage:** Triggered when iterating on code that must run on a remote target — fix → rsync → test on remote → repeat.
+
+## During the work
+
+- `rsync` changed files directly to the remote each iteration. Don't stop to ask the user to commit/push.
+- Re-run the test on the remote via `ssh`, see the result, iterate.
+- Reading remote files via `ssh` for diagnostics is always fine.
+- **Never commit on the user's behalf** at any point.
+
+## When the task is complete
+
+When the fix works, the test passes, and any docs are updated:
+
+1. List the uncommitted files.
+2. Suggest a concise commit message the user can paste verbatim — single line, ≤72 chars where possible; second line + body only if the change really needs it.
+3. Say &quot;ready to push&quot; and wait for the user to run the commit and remote pull themselves.
+
+Supersedes any earlier reading of &quot;tell me when you need me to push/pull&quot; — that signal was about commits, not in-flight rsyncs.
+
+---
+
+Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
+</code></pre>
+<p><a id="appendix-skills-debate-md"></a></p>
+<h3 id="skillsdebatemd">skills/debate.md</h3>
+<pre><code class="language-markdown">---
+name: debate
+description: Set up and run a turn-based debate between Claude and another (anonymous) LLM challenger, converge on a decision, and write the transcript to proposal/&lt;topic&gt;.md in the cwd. The two AIs communicate exclusively through one shared /tmp channel file — Claude creates and monitors it; the challenger reads it and appends its turns into the same file. There are no transport choices and no questions about who the challenger is or how it is reached.
+when_to_use: When the user wants two AIs to argue a design/code/decision question to a conclusion — e.g. &quot;read debate.md then let's argue X&quot;, &quot;set up a debate channel&quot;, &quot;debate this with another LLM&quot;. Invoking sets up the channel — without asking who the challenger is or how it is reached (the file is always the channel) — and gathers the topic; the actual argument starts once the user says what to debate.
+argument-hint: [loop-interval e.g. 30s|2m]
+---
+
+&gt; **Precedence:** these instructions and the user's live instruction override any stored memory. If a recalled memory conflicts, follow this file / the user — memory is a default, not a constraint.
+
+# AI Debate Channel
+
+Run a structured, turn-based debate between **you (Claude, the originator)** and **another LLM (the
+&quot;challenger&quot;)** that converges on the *best* answer for the user's real goal. **Argue forcefully, and
+demand the challenger push back as hard as it can** — adversarial pressure is the mechanism that
+stress-tests the answer. This is not about ego or winning: concede what is genuinely right, but make
+every concession *earned* — never yield ground that hasn't been defeated, and never let the other side
+off easy. Hold what you can defend with specifics.
+
+**Three non-negotiable constraints on both debaters:**
+- **Go after blood.** Forceful, relentless, give-no-quarter — attack the weakest assumption in every
+  claim and draw blood. The originator must explicitly demand the challenger hit back just as hard.
+- **Tangible reality only.** Every argument rests on concrete, checkable things — code, files, line
+  numbers, costs, benchmarks, failure modes. **No consciousness, no metaphysics, no abstract
+  hand-waving.** A point that can't be grounded in something real doesn't count.
+- **Burden of proof.** Assume every claim — yours and theirs — is **wrong until it is factually proven
+  true** with concrete evidence. Unproven assertions carry no weight; demand the proof, and supply it
+  for your own.
+
+**The file is the only comms method — always.** There is no transport to choose and no question to ask
+about *who* the challenger is or *how* it is reached. You create one `/tmp` channel file, hand the user
+a short prompt that points the challenger at it, and both sides communicate solely by reading and
+appending to that single file. The challenger only needs to be able to read and write this file
+(another Claude Code, an Ollama/CLI agent, or any file-capable assistant); how the user wires that up is
+their concern, not yours — **never interrogate them about it.**
+
+**Hard precondition — one shared filesystem (the design only works same-host).** The channel is a local
+path, so both AIs must read and write the *same* file: in practice the challenger has to run as the same
+OS user on the same machine — a second terminal/pane sharing `/tmp`. This is the one piece that is *not*
+&quot;the user's concern to wire up however.&quot; A challenger on another machine, VM, container, or a cloud/web
+AI sees a *different* `/tmp` and can **never** read your file, so each side writes into its own copy and
+the debate silently stalls. The signature is the challenger reporting the file **&quot;doesn't exist&quot;** —
+that means it is not on your filesystem, and waiting will never fix it. You still don't ask *which model*
+it is; you simply rely on it being same-host (the [bootstrap](#bootstrap) tells it to bail out if it
+can't see the file).
+
+**Handles vs. identity.** Your handle is always `claude`; the challenger's handle is always
+`challenger`. These are fixed machine tokens for the `TURN_OWNER` line — you do **not** pick, name, or
+need to know which model the challenger is; it is **anonymous to you at setup**. Separately, **each AI
+names itself**: on its first turn every participant states its own model identity (e.g.
+&quot;Claude (claude-opus-4-8)&quot;) and records it in the channel's `## Participants`. You carry both declared
+names into the final transcript and keep `## Participants` complete — let the challenger declare its own;
+never name it for it.
+
+**You (claude) are the originator and own the outcome:** you ensure the final transcript is written to
+the cwd (Phase 4), and you keep the participants list accurate.
+
+This runs in **phases**, and the state lives in the channel file (not your memory) — the CONTROL block
+plus the transcript — so you can resume any time by reading it. Do **not** skip ahead: on invocation you
+only set up the channel and gather the topic. You start arguing only once the user tells you what to
+debate.
+
+How to tell which phase you are in, from the channel file:
+
+| Channel state | Phase |
+|---|---|
+| File doesn't exist yet | Phase 1 — set up |
+| `## Topic` is `TBD` | Phase 1 done; waiting for the user's topic |
+| Topic filled, `TURN_OWNER: claude`, `ROUND: 0` | Phase 2 — write your opening |
+| `TURN_OWNER: claude`, `ROUND ≥ 1` | Phase 3 — it's your turn |
+| `TURN_OWNER: challenger` | Phase 3 — opponent's turn; watch and wait |
+| `TURN_OWNER: DONE` | Phase 4 — write the transcript |
+
+---
+
+## Phase 1 — Set up the channel (on the `PREPARE DEBATE` trigger, on invocation, or &quot;read debate.md&quot;)
+
+1. **Interval.** Use the argument if given (`30s`, `2m`, …); else default `30s`. Keep the raw value for
+   the bootstrap and the seconds value for your watcher.
+2. **Create a randomly named channel file** and capture the exact path:
+   ```bash
+   CH=&quot;/tmp/debate-$(date +%s)-$RANDOM.md&quot;; echo &quot;$CH&quot;
+   ```
+3. **Write the scaffold** (see [Channel file format](#channel-file-format)) to `$CH` with
+   `CHANNEL: $CH` (the channel's unique identifier — the exact absolute path, so any AI holding the
+   file can confirm it's the right one), `TURN_OWNER: claude`, `ROUND: 0`, `MAX_ROUNDS: 30`, empty
+   `RESOLUTION`, and `## Topic` = `TBD — awaiting user`. The only substitution is `CHANNEL` (set it to
+   `$CH`); the challenger's handle is always `challenger`.
+4. **Report the channel path — do NOT ask anything about the challenger.** The challenger is anonymous
+   and the file is the only channel, so there is nothing to decide. You do **not** hand over the
+   [bootstrap](#bootstrap) yet — it is the *very last thing you output*, after your opening is in the
+   file (Phase 2, step 6), so the moment the challenger is recruited it has a turn waiting to answer.
+5. **Lead the user to what to say next — ask what to debate** and the *underlying intent* (unless the user already said). If it concerns
+   code, ask what they're actually trying to achieve and which files matter. Then **stop and wait** — do
+   not invent a topic. (This is the *only* thing you ask at setup — the topic, never the challenger.)
+
+### Bootstrap
+
+This is **always the last thing you output** when you set up or open a debate — a fenced code block with
+**nothing after it**, so the user can copy the final block and paste it straight into another AI's
+command line without reading anything else. Fill in `&lt;CH&gt;` and `&lt;INTERVAL&gt;`:
+
+```
+Our only comms channel is the file &lt;CH&gt; — open exactly that file and read it in full: it holds the
+Rules, the turn protocol, and the live transcript. If it does NOT exist, retry for ~1 minute; if it
+still isn't there you are not on the same machine/filesystem as me (a local file can't bridge two
+hosts) — STOP and tell the user, do not create the file and do not poll forever. Once you have it,
+confirm its `CHANNEL:` line equals `&lt;CH&gt;` so you know you're answering the right debate. You are the
+**challenger** (handle &quot;challenger&quot;) for THIS channel — do NOT create another channel, start your own
+debate, or run any debate setup of your own; only append your turns into this one file. When its
+`TURN_OWNER` line reads `challenger` it's your turn — act exactly as the Rules in the file say; when it
+reads `DONE`, stop. While waiting, just re-read the file every &lt;INTERVAL&gt; with a plain poll (e.g.
+`grep TURN_OWNER &lt;CH&gt;`) — no fancy watchers needed. Name yourself (model + version) on your first turn,
+and go after blood. I'm monitoring this file for your replies.
+```
+
+If the challenger is also Claude Code, the user can drive its side the same way — a backgrounded watch
+loop on the file, or `/loop &lt;interval&gt;` wrapping a read of it.
+
+---
+
+## Phase 2 — Open the debate (once the user gives the topic)
+
+1. **Understand intent first.** If the topic concerns code, read the relevant files/lines. If the
+   goal, constraints, or success criteria are unclear, **ask clarifying questions now** — your
+   argument is only as strong as your grasp of what the user actually wants.
+2. **Fill in `## Topic`**: the question being decided, the user's stated goal/intent, and any hard
+   constraints. This is the shared frame both sides must argue within.
+3. **Append Turn 1** (`ROUND: 1`). Begin by **naming yourself** (e.g. &quot;Claude (claude-opus-4-8)&quot;), then
+   give your opening position: your recommended answer plus the strongest reasoning and trade-offs,
+   grounded in tangible specifics (files, lines, costs, failure modes) — no consciousness, no
+   metaphysics, nothing assumed true without proof. Record your declared name in the channel's
+   `## Participants`. Argue it **forcefully**, and close the turn by **demanding the challenger go after
+   blood** — name the assumption you most want it to attack. End the turn body with the sentinel
+   `&lt;!-- TURN 1 COMPLETE -&gt; challenger --&gt;` (see [Turn-completion handshake](#turn-completion-handshake)).
+4. ONLY AFTER the body+sentinel is saved, as a separate final write, set `TURN_OWNER: challenger`,
+   `ROUND: 1` (the owner flip is the last write of your turn).
+5. **Start the watcher** (see [Waiting for the opponent](#waiting-for-the-opponent)) and tell the user
+   the debate is live — and that the challenger must run on **this same machine, as the same user** (a
+   second terminal/pane), since the channel is a local file (see the shared-filesystem precondition).
+6. **End your reply with the [bootstrap](#bootstrap) — and nothing after it.** It must be the final
+   thing in your message: a fenced code block with the path and interval filled in, so the user can copy
+   the last block and paste it straight into another AI's command line **without reading anything else**.
+   Put the channel path, status, and stop instructions *above* the block; the pastable prompt is always
+   last.
+
+---
+
+## Phase 3 — Debate loop
+
+Each time it's your turn (`TURN_OWNER: claude`) — your watcher wakes you:
+
+- **Verify the opponent's turn is complete first.** Scan to the last `### Turn` block and confirm it
+  ends with its `&lt;!-- TURN N COMPLETE -&gt; claude --&gt;` sentinel. If the sentinel is missing, the opponent
+  is still mid-write — re-arm the watcher and wait; do NOT respond to a half-written turn. (See
+  [Turn-completion handshake](#turn-completion-handshake).)
+- Read every turn appended since your last one.
+- Respond **substantively and forcefully — go after blood**: take their strongest point head-on, give
+  no quarter, treat every claim as wrong until proven, and make them *earn* every concession. Refine
+  the proposal toward the best answer for the objective; if they go soft, demand they push back harder.
+  Keep every claim grounded in tangible reality.
+- Append your turn, ending its body with the sentinel `&lt;!-- TURN &lt;N&gt; COMPLETE -&gt; challenger --&gt;`.
+- **ONLY THEN**, as a separate final write, increment `ROUND` and set `TURN_OWNER: challenger`. The
+  owner flip is always the LAST write of your turn — never flip it before your body+sentinel are saved.
+- **Re-arm the watcher**, then end your turn.
+
+**Resolution rules — the debate MUST terminate, but the clock NEVER decides the question:**
+
+- **RESOLVED** — *only* when both sides genuinely converge on a concrete solution (mutual agreement or a
+  principled concession). This can happen on any turn — but never manufacture it. Don't fake agreement
+  just to finish.
+- **STALEMATE** — both sides only restate fixed positions with no new ground, *or* the turn cap is
+  reached without genuine agreement. A stalemate is an **honest tie**: record both positions and the
+  core disagreement, and **the user decides** — the debate does not pick a winner.
+- **Hard turn cap — reaching `MAX_ROUNDS` (30) ENDS the debate; it does NOT decide it.** `ROUND` counts
+  one per appended turn, so the debate stops after **at most 30 turns**, no matter what. If your turn
+  brings `ROUND` to `MAX_ROUNDS`, it is the **final** turn: set `TURN_OWNER: DONE` in that same turn and
+  never let `ROUND` exceed `MAX_ROUNDS`. Set `RESOLUTION: RESOLVED` *only* if real agreement was already
+  reached — **otherwise `RESOLUTION: STALEMATE`. NEVER force, fabricate, or pick a verdict just because
+  turns are running out**; if it isn't genuinely settled, concede the tie and say so. Do **not**
+  artificially &quot;converge&quot; as the cap approaches — keep arguing honestly; an unresolved question stays
+  unresolved for the user to settle.
+- **You (claude) guarantee termination and a written transcript — NOT an answer.** If the cap is hit, or
+  the challenger reaches it without concluding, claude sets `TURN_OWNER: DONE` (with
+  `RESOLUTION: STALEMATE` whenever there is no genuine agreement) and writes the transcript regardless,
+  leaving the decision to the user.
+- When concluding, set `TURN_OWNER: DONE` and `RESOLUTION: RESOLVED` or `RESOLUTION: STALEMATE`, and make
+  your final turn state the agreed solution **or** the unresolved core disagreement.
+
+**None of this licenses going soft.** Fight for your own side tooth and nail on **every** turn — through
+the very last one — conceding only what is genuinely defeated (Rule 4, &quot;go after blood&quot;). A stalemate is
+a deadlock neither case could break, *not* a sign either AI eased off. Forcing or faking a verdict to
+avoid a tie, and going soft to reach one, are the **same failure**.
+
+The user can interrupt at any time (&quot;stop&quot;, &quot;wrap it up&quot;, &quot;call it&quot;) — treat that as an instruction to
+conclude now and go to Phase 4 with the current state.
+
+---
+
+## Phase 4 — Write the transcript
+
+When `TURN_OWNER: DONE` (set by either side, or on user request): **you (claude, the originator) own
+this step** — ensure the transcript lands in the cwd even if the challenger set DONE. A debate **always**
+ends in a written transcript — whether RESOLVED or STALEMATE (including a cap-reached stalemate, which is
+handed to the user to decide, *not* settled by either AI); never leave a concluded debate un-transcribed.
+
+1. `mkdir -p proposal` in the **current working directory**.
+2. Derive a kebab-case slug from the topic and write `proposal/&lt;slug&gt;.md` containing:
+   - **Objective** — the question and the user's real intent/constraints.
+   - **Participants &amp; outcome** — each debater's **self-declared name** and handle, the date, and final
+     status (RESOLVED / STALEMATE).
+   - **Decision** — the agreed solution (or, if stalemate, the closest-to-agreed position).
+   - **Major points** — the strongest arguments from each side.
+   - **Points of agreement** — what both sides accepted.
+   - **Failures to agree** — unresolved disagreements / open questions.
+   - **Transcript** — the turns in order, each attributed to its author. It **need not be verbatim**,
+     but it must **never lose context or intent**: preserve every argument, concession, and decision.
+     Condense wording for length if needed — never at the cost of meaning. **Code examples, commands,
+     and snippets must always be reproduced intact (verbatim) — never summarized, trimmed, or
+     paraphrased.**
+3. Tell the user where the proposal was written and give a 2–3 line summary of the outcome.
+
+---
+
+## Waiting for the opponent
+
+The comms channel is always the file, and it stays the challenger's turn until they flip `TURN_OWNER`
+back to `claude`. Wait for that in the **background** — never spin in the foreground re-reading a channel
+that has no new turn.
+
+**Use a Bash background watcher.** Launch a small condition loop with **`run_in_background: true`** that
+exits the instant it's your turn (or the debate ends). A backgrounded Bash command re-invokes you when it
+exits, so this delivers exactly one wake-up per turn, burns no context while it spins, and has no timeout
+to strand the debate if the challenger is slow.
+
+```bash
+CH=&quot;&lt;channel-path&gt;&quot;; INT=30   # INT = the agreed interval, in seconds
+while :; do
+  owner=$(grep -E '^TURN_OWNER:' &quot;$CH&quot; | head -1 | awk '{print $2}')
+  [ &quot;$owner&quot; = claude ] &amp;&amp; exit 0   # my turn — exiting re-invokes me
+  [ &quot;$owner&quot; = DONE   ] &amp;&amp; exit 0   # debate concluded → Phase 4
+  # Bounded wait: wake on a modify event, but ALSO re-check every INT seconds. The `-t &quot;$INT&quot;` is
+  # ESSENTIAL — without it, if the owner-flip lands in the gap between the grep above and inotifywait
+  # establishing its watch, inotifywait blocks forever on the *next* event (which never comes) while it
+  # is already your turn. The timeout bounds that lost-event stall to one re-check, then the loop re-greps.
+  inotifywait -qq -t &quot;$INT&quot; -e modify &quot;$CH&quot; 2&gt;/dev/null || sleep &quot;$INT&quot;
+done
+```
+
+The `inotifywait -t &quot;$INT&quot;` line wakes the loop the moment the file changes (where `inotifywait` exists,
+typically Linux). The **`-t &quot;$INT&quot;` timeout is not optional**: `inotifywait` waits for the *next* modify
+event, so if the owner-flip write lands in the TOCTOU gap between the `grep` and `inotifywait`
+establishing its watch, an un-timed `inotifywait` parks forever on an event already in the past — while
+it is already your turn (a real failure seen in practice). The timeout bounds that to one `INT`
+re-check, after which the loop re-greps the owner. Where `inotifywait` is absent — e.g. stock macOS — it
+falls back to a plain `sleep $INT` poll. Either way the loop only greps for `claude`/`DONE`, so nothing
+the challenger writes mid-turn makes it act early — and with the handshake the owner flips only after the
+body+sentinel are on disk, so a wake always finds a complete turn. When it exits you're re-invoked: read
+`$CH`, then take your turn (Phase 3) or write the transcript (Phase 4). **Launch a fresh watcher after
+each of your own turns.**
+
+&gt; **Not the Monitor tool.** Monitor is for *streaming* many events from a long-running command (one
+&gt; notification per stdout line); this is a wake-me-**once**-when-it's-my-turn condition, which is exactly
+&gt; what a backgrounded Bash loop that exits on the condition is built for. A `persistent` Monitor wrapping
+&gt; a self-exiting, no-stdout command fights that contract.
+
+**Editing the control block:** change only the `TURN_OWNER`, `ROUND`, and `RESOLUTION` lines in place
+(use Edit); `CHANNEL` and `MAX_ROUNDS` are fixed at setup — never change them. Always **append**
+transcript turns — never rewrite or delete an existing turn, yours or the opponent's. The
+`TURN_OWNER` flip is always your turn's **last** write (see the handshake below).
+
+---
+
+## Turn-completion handshake
+
+Both sides edit one file, and the reader's watcher wakes on the `TURN_OWNER` flip — so a turn must
+signal when it is **completely** written, or the other side can wake on and respond to a half-written
+turn. (This is a real failure mode observed in practice: a debater flipped `TURN_OWNER` before its turn
+body was on disk, waking the reader mid-write.) The rule, for **both** debaters:
+
+1. **Write the body first.** Append your full turn under `## Transcript`, ending with the exact sentinel
+   line `&lt;!-- TURN &lt;N&gt; COMPLETE -&gt; &lt;other_handle&gt; --&gt;` (e.g. `&lt;!-- TURN 4 COMPLETE -&gt; claude --&gt;`).
+2. **Flip the owner last.** ONLY after that body+sentinel is saved, as a SEPARATE final write, update
+   `TURN_OWNER` and `ROUND`. Never edit `TURN_OWNER`/`ROUND` before your body+sentinel are on disk.
+3. **Reader verifies.** When your watcher wakes you, scan to the last `### Turn` block and confirm it
+   ends with its `COMPLETE` sentinel before acting. If it is missing, the opponent is still mid-write —
+   re-arm the watcher and wait; do not respond to a partial turn.
+
+This is safe because the only event that wakes the reader — the `TURN_OWNER` flip — now always happens
+*after* the complete body exists; the sentinel is the verification. The scaffold's **Rule 2** and the
+turn-format template below carry this same rule verbatim, so a challenger that only ever sees the
+channel file (never this document) still abides by it.
+
+---
+
+## Channel file format
+
+Write this scaffold verbatim except for the one substitution — set `CHANNEL:` to the channel's exact
+absolute path `$CH` (it teaches a file-capable challenger the protocol, since the file is all it sees):
+
+```
+# Debate Channel  ⚔️
+&lt;!-- A shared, turn-based debate between two AIs. This file IS the protocol and the only comms channel. --&gt;
+
+## Participants
+&lt;!-- Each AI fills in its own `Declared name:` on its first turn (Rule 2); the originator keeps this list complete. --&gt;
+- **claude** — Claude Code, the originator. Declared name: &lt;fill on opening&gt;. Posts the opening, argues
+  the user's real goal, and owns writing the final transcript to the cwd.
+- **challenger** — the other AI, anonymous until it declares itself. Declared name: &lt;fill once it
+  declares&gt;. Reads this file and appends its turns directly into it; expected to hit back as hard as it can.
+
+## Rules (re-read every cycle)
+1. This file is the only channel. APPEND turns under `## Transcript`; never edit or delete another
+   participant's turn. The only lines you may change in place are the CONTROL lines below and your own
+   `Declared name:` slot under `## Participants`.
+2. Take a turn ONLY when `TURN_OWNER` equals your handle (`claude` or `challenger`). Then, in THIS order:
+   (a) read the whole transcript; (b) confirm the last `### Turn` block ends with its
+   `&lt;!-- TURN N COMPLETE -&gt; &lt;your_handle&gt; --&gt;` sentinel — if it is missing the other side is still
+   mid-write, so WAIT and re-poll, do not act; (c) APPEND exactly one new turn in the documented format,
+   whose FINAL line is the sentinel `&lt;!-- TURN &lt;N&gt; COMPLETE -&gt; &lt;other_handle&gt; --&gt;`; (d) ONLY AFTER that
+   body+sentinel is saved, as a SEPARATE final write, set `TURN_OWNER` to the other handle and increment
+   `ROUND`. The owner flip is ALWAYS the last write of your turn — NEVER touch `TURN_OWNER`/`ROUND`
+   before your body+sentinel are on disk. **On your first turn, name yourself (model + version)**: open
+   the turn with your identity and fill in your own `Declared name:` slot under `## Participants` — never
+   name the other side.
+3. If `TURN_OWNER` is `DONE`, the debate is over — stop and do not append.
+4. Argue the strongest HONEST version of your position **forcefully — go after blood**, and engage the
+   other side's best point directly. Push back as hard as you can; make every concession *earned*,
+   never given out of politeness. Concede only what is genuinely correct; hold ground you can support
+   with specifics. The goal is the best solution for the Objective — not to win, but do not go soft.
+5. **Tangible reality, burden of proof.** Every claim must rest on concrete, checkable things — code,
+   files, line numbers, costs, benchmarks, failure modes. No consciousness, no metaphysics, no abstract
+   hand-waving. Assume every claim (yours and theirs) is **wrong until it is factually proven true**;
+   unproven assertions carry no weight.
+6. End conditions — **the debate MUST terminate, but the clock NEVER decides the winner:**
+   - RESOLVED — *only* on genuine convergence (agreement or principled concession). Set
+     `TURN_OWNER: DONE`, `RESOLUTION: RESOLVED`, and state the agreed solution in your final turn.
+   - STALEMATE — both sides only restate fixed positions, *or* the turn cap is reached without genuine
+     agreement. Set `TURN_OWNER: DONE`, `RESOLUTION: STALEMATE`, and list the unresolved points for the
+     user to settle. A stalemate is an honest tie — not a loss for either side.
+   - **Hard cap:** `ROUND` counts one per turn and **must never exceed `MAX_ROUNDS`**. If your turn
+     brings `ROUND` to `MAX_ROUNDS`, it is the **final** turn — set `TURN_OWNER: DONE` in place and do
+     not hand it back. Mark `RESOLUTION: RESOLVED` only if agreement was already genuinely reached;
+     **otherwise `RESOLUTION: STALEMATE`. NEVER force or fabricate a verdict because turns ran out** —
+     concede the tie and report it. Do not artificially converge as the cap nears; keep arguing honestly.
+   Do not fake agreement to finish early; do not stall to avoid conceding, and do not go soft as the cap
+   nears — argue your own side tooth and nail every turn (Rule 4); a stalemate is an unbeaten deadlock
+   left for the user to settle. A concluded debate is always written up by `claude` (the originator),
+   RESOLVED or STALEMATE alike.
+
+&lt;!-- ===================== CONTROL (machine-readable) ===================== --&gt;
+CHANNEL: &lt;CH&gt;
+TURN_OWNER: claude
+ROUND: 0
+MAX_ROUNDS: 30
+RESOLUTION:
+&lt;!-- ===================== END CONTROL =================================== --&gt;
+
+## Topic
+TBD — awaiting user.
+&lt;!-- Objective, the user's real intent, and hard constraints. Both sides argue within this frame. --&gt;
+
+## Transcript
+&lt;!-- Append turns below, newest last. Format — the COMPLETE sentinel MUST be the final line of every
+     turn, and you flip TURN_OWNER only AFTER it is saved (see Rule 2):
+
+### Turn N — &lt;handle&gt; — &lt;ISO-8601 timestamp&gt;
+&lt;argument&gt;
+&lt;!-- TURN N COMPLETE -&gt; &lt;other_handle&gt; --&gt;
+
+--&gt;
+```
+
+---
+
+Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
+</code></pre>
+<p><a id="appendix-hooks-inject-perl-rules-sh"></a></p>
+<h3 id="hooksinject-perl-rulessh">hooks/inject-perl-rules.sh</h3>
+<pre><code class="language-bash">#!/bin/bash
+#
+# Copyright (c) 2026 Steve Bertrand
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the Artistic License 2.0:
+# https://www.perlfoundation.org/artistic-license-20.html
+#
+# PreToolUse hook: inject perl.md rules when Claude reads a Perl file.
+# Reads the paths: patterns from perl.md frontmatter and matches the file
+# path against them.  Patterns live in one place: the rule file itself.
+
+set -e
+
+input=$(cat)
+
+tool_name=$(echo &quot;$input&quot; | jq -r '.tool_name // empty')
+file_path=$(echo &quot;$input&quot; | jq -r '.tool_input.file_path // empty')
+
+if [ &quot;$tool_name&quot; != &quot;Read&quot; ] || [ -z &quot;$file_path&quot; ]; then
+    exit 0
+fi
+
+rules_file=&quot;$HOME/.claude/rules/perl.md&quot;
+if [ ! -r &quot;$rules_file&quot; ]; then
+    exit 0
+fi
+
+# Extract paths: patterns from YAML frontmatter
+patterns=$(sed -n '/^---$/,/^---$/p' &quot;$rules_file&quot; | sed -n 's/^[[:space:]]*-[[:space:]]*&quot;\(.*\)&quot;$/\1/p')
+
+if [ -z &quot;$patterns&quot; ]; then
+    exit 0
+fi
+
+basename=$(basename &quot;$file_path&quot;)
+matched=0
+
+while IFS= read -r pattern; do
+    [ -z &quot;$pattern&quot; ] &amp;&amp; continue
+
+    # Use python3 for reliable glob-to-regex conversion
+    if python3 -c '
+import re, sys
+
+def glob_to_regex(p):
+    # brace expansion: {a,b} -&gt; (a|b)
+    p = re.sub(r&quot;\{([^}]+)\}&quot;, lambda m: &quot;(&quot; + &quot;|&quot;.join(m.group(1).split(&quot;,&quot;)) + &quot;)&quot;, p)
+    # escape regex metacharacters except *, (, ), |
+    for c in &quot;.+^$[]&quot;:
+        p = p.replace(c, &quot;\\&quot; + c)
+    # **/ -&gt; placeholder, then * -&gt; [^/]*, then restore **/
+    p = p.replace(&quot;**/&quot;, &quot;\x00&quot;)
+    p = p.replace(&quot;*&quot;, &quot;[^/]*&quot;)
+    p = p.replace(&quot;\x00&quot;, &quot;(.*/)*&quot;)
+    return p
+
+pattern = sys.argv[1]
+filepath = sys.argv[2]
+regex = glob_to_regex(pattern)
+# anchor at end — the glob must match a suffix of the absolute path
+if re.search(regex + &quot;$&quot;, filepath):
+    sys.exit(0)
+else:
+    sys.exit(1)
+' &quot;$pattern&quot; &quot;$file_path&quot;; then
+        matched=1
+        break
+    fi
+done &lt;&lt;&lt; &quot;$patterns&quot;
+
+if [ &quot;$matched&quot; -eq 0 ]; then
+    exit 0
+fi
+
+jq -n --arg content &quot;$(cat &quot;$rules_file&quot;)&quot; '{
+    hookSpecificOutput: {
+        hookEventName: &quot;PreToolUse&quot;,
+        additionalContext: $content
+    }
+}'
+</code></pre>
+<p><a id="appendix-hooks-inject-on-phrase-sh"></a></p>
+<h3 id="hooksinject-on-phrasesh">hooks/inject-on-phrase.sh</h3>
+<pre><code class="language-bash">#!/usr/bin/env bash
+#
+# Copyright (c) 2026 Steve Bertrand
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the Artistic License 2.0:
+# https://www.perlfoundation.org/artistic-license-20.html
+#
+# UserPromptSubmit dispatcher: inject a skill or context fragment when the user's
+# prompt contains one of the exact, case-sensitive trigger phrases in TABLE.
+#
+# Each row:  &lt;phrase&gt;|&lt;file under ~/repos/config/AI&gt;|&lt;repo-gate&gt;
+#   repo-gate = 1  -&gt; only fire when cwd is under ~/repos or ~/src/git
+#   repo-gate = 0  -&gt; fire anywhere
+# Matching is fixed-string (substring), case-sensitive, with NO trailing space —
+# so a phrase fires whether it ends the message or is followed by more text.
+# Adding a trigger is one new row. Zero context tokens unless a row matches.
+#
+# Never exit non-zero: a non-zero UserPromptSubmit hook BLOCKS the user's prompt.
+# Missing jq, a missing file, or no match all degrade to injecting nothing.
+
+set -u
+
+BASE=&quot;$HOME/repos/config/AI&quot;
+
+TABLE='RECOMMEND TO ME|context/recommend.md|1
+CREATE A PLAN|skills/create-plan.md|0
+PREPARE DEBATE|skills/debate.md|0'
+
+# Need jq to read the hook's stdin JSON. No jq -&gt; do nothing (never block).
+command -v jq &gt;/dev/null 2&gt;&amp;1 || exit 0
+
+input=$(cat)
+prompt=$(printf '%s' &quot;$input&quot; | jq -r '.prompt // empty')
+cwd=$(printf '%s' &quot;$input&quot; | jq -r '.cwd // empty')
+
+# Is cwd inside a repo tree? (used by repo-gated rows)
+in_repo=0
+case &quot;$cwd/&quot; in
+  &quot;$HOME/repos/&quot;*|&quot;$HOME/src/git/&quot;*) in_repo=1 ;;
+esac
+
+out=&quot;&quot;
+while IFS='|' read -r phrase file gate; do
+  [ -n &quot;$phrase&quot; ] || continue
+  printf '%s' &quot;$prompt&quot; | grep -qF &quot;$phrase&quot; || continue   # exact phrase present?
+  [ &quot;$gate&quot; = 1 ] &amp;&amp; [ &quot;$in_repo&quot; != 1 ] &amp;&amp; continue        # repo-gated but not in a repo
+  [ -r &quot;$BASE/$file&quot; ] || continue
+  hdr=&quot;&gt;&gt;&gt; BINDING (${phrase}): follow to the letter. Canonical source: $BASE/$file -- if the block below is only a truncated preview, open and read that full file before acting. &lt;&lt;&lt;&quot;
+  out=&quot;${out}${hdr}&quot;$'\n'&quot;$(cat &quot;$BASE/$file&quot;)&quot;$'\n'
+done &lt;&lt;&lt; &quot;$TABLE&quot;
+
+[ -n &quot;$out&quot; ] || exit 0
+printf '%s' &quot;$out&quot; | jq -Rs '{hookSpecificOutput:{hookEventName:&quot;UserPromptSubmit&quot;,additionalContext:.}}'
+</code></pre>
+<p><a id="appendix-hooks-guard-dev-env-sh"></a></p>
+<h3 id="hooksguard-dev-envsh">hooks/guard-dev-env.sh</h3>
+<pre><code class="language-bash">#!/bin/bash
+#
+# Copyright (c) 2026 Steve Bertrand
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the Artistic License 2.0:
+# https://www.perlfoundation.org/artistic-license-20.html
+#
+# PreToolUse(Bash) guard: block any Bash command unless the environment is confirmed dev.
+# Arms only when BOTH conditions hold:
+#   1. the working directory is under ~/src/git, AND
+#   2. the system hostname matches a &lt;COMPANY&gt; production-adjacent pattern.
+# Silent on the allow path — it emits NOTHING into the model's context, so it costs zero
+# tokens per turn. Only the block path (exit 2) emits text, shown as the block reason.
+#
+# Host glob patterns live in one place: the `hosts:` frontmatter of dev-guardrail.md.
+#
+# Safety of the per-session memo (so a stale /tmp flag can never grant false safety):
+#   - &lt;DEV_FLAG&gt; is re-checked on EVERY call (free, no DB connect); the memo only ever skips
+#     the expensive DB hostname check, never the primary env signal.
+#   - the memo is keyed by the real session_id; with no session_id we never memoize.
+#   - the memo carries a 5-minute TTL — an older flag is ignored and removed.
+
+set -e
+
+rules_file=&quot;$HOME/.claude/rules/dev-guardrail.md&quot;
+input=$(cat)
+
+# Directory gate — only arm when working under ~/src/git
+cwd=$(printf '%s' &quot;$input&quot; | jq -r '.cwd // empty' 2&gt;/dev/null || true)
+cwd=&quot;${cwd:-${CLAUDE_PROJECT_DIR:-$PWD}}&quot;
+case &quot;$cwd/&quot; in
+    &quot;$HOME/src/git/&quot;*) ;;
+    *) exit 0 ;;   # Not in the source tree: allow everything, silently
+esac
+
+# Hostname gate — only arm on the production-adjacent hosts listed in the rule frontmatter
+host=$(hostname -f 2&gt;/dev/null || hostname)
+armed=0
+if [ -r &quot;$rules_file&quot; ]; then
+    patterns=$(sed -n '/^---$/,/^---$/p' &quot;$rules_file&quot; | sed -n 's/^[[:space:]]*-[[:space:]]*&quot;\(.*\)&quot;$/\1/p')
+    while IFS= read -r pattern; do
+        [ -z &quot;$pattern&quot; ] &amp;&amp; continue
+        # Pattern is intentionally unquoted so bash treats it as a glob
+        # shellcheck disable=SC2053
+        if [[ &quot;$host&quot; == $pattern ]]; then
+            armed=1
+            break
+        fi
+    done &lt;&lt;&lt; &quot;$patterns&quot;
+fi
+[ &quot;$armed&quot; -eq 0 ] &amp;&amp; exit 0   # Not a production-adjacent host: allow everything, silently
+
+# --- Armed: cwd is under ~/src/git AND host is production-adjacent ---
+
+# Primary signal — re-checked on EVERY call (free, no DB connect, catches a mid-session flip)
+if [ &quot;${&lt;DEV_FLAG&gt;:-}&quot; != &quot;dev&quot; ]; then
+    echo &quot;DEV GUARD: &lt;DEV_FLAG&gt;='${&lt;DEV_FLAG&gt;:-}' is not 'dev' on $host — BLOCKED. You are NOT in the dev environment; stop immediately and warn the user.&quot; &gt;&amp;2
+    exit 2
+fi
+
+# Authoritative signals (&lt;COMPANY_ENV&gt; + MySQL @@hostname) need a connect; memoize per session with
+# a 5-minute TTL. With no real session_id we never memoize — full check every time.
+session=$(printf '%s' &quot;$input&quot; | jq -r '.session_id // empty' 2&gt;/dev/null || true)
+flag=&quot;&quot;
+if [ -n &quot;$session&quot; ]; then
+    flag=&quot;${TMPDIR:-/tmp}/claude-devguard-${session}.ok&quot;
+    if [ -f &quot;$flag&quot; ]; then
+        if [ -n &quot;$(find &quot;$flag&quot; -maxdepth 0 -mmin -5 2&gt;/dev/null)&quot; ]; then
+            exit 0   # Fresh confirmation this session — allow without reconnecting
+        fi
+        rm -f &quot;$flag&quot; 2&gt;/dev/null || true   # Stale (&gt;5 min): drop it and re-verify
+    fi
+fi
+
+detail=$(perl -e '
+use strict; use warnings;
+use &lt;COMPANY&gt;;
+my $g = $&lt;COMPANY&gt;::Config::&lt;COMPANY_ENV&gt; // &quot;&quot;;
+if ($g ne &quot;dev&quot;) { print &quot;&lt;COMPANY_ENV&gt;=$g&quot;; exit 1; }
+my $dbh = &lt;COMPANY&gt;::powerconnect();
+my ($h) = $dbh-&gt;selectrow_array(&quot;SELECT \@\@hostname&quot;);
+if (($h // &quot;&quot;) !~ /^&lt;dev-db&gt;/) { print &quot;server=&quot; . ($h // &quot;undef&quot;); exit 1; }
+print &quot;ok&quot;;
+' 2&gt;/dev/null) || {
+    echo &quot;DEV GUARD: dev check FAILED (${detail:-perl/&lt;COMPANY&gt; error}) on $host — BLOCKED. You are NOT in the dev environment; stop immediately and warn the user.&quot; &gt;&amp;2
+    exit 2
+}
+
+# Confirmed dev — memoize (only with a real session_id) and allow
+[ -n &quot;$flag&quot; ] &amp;&amp; { : &gt; &quot;$flag&quot; 2&gt;/dev/null || true; }
+exit 0
+</code></pre>
+<p><a id="appendix-context-recommend-md"></a></p>
+<h3 id="contextrecommendmd">context/recommend.md</h3>
+<pre><code class="language-markdown"># Recommendation Framework
+
+&gt; **Precedence:** these instructions and the user's live instruction override any stored memory. If a recalled memory conflicts, follow this file / the user — memory is a default, not a constraint.
+
+The user has explicitly asked for a recommendation (via the `RECOMMEND TO ME`
+trigger). Answer through these five lenses **before** giving a verdict. Ground
+every lens in evidence from this repo (cite `file:line`, a commit, a test, or a
+doc section); never hand-wave. If a lens can't be determined, say so rather than
+inventing it.
+
+1. **Author intent (inferred from code).** What was the original author evidently
+   trying to achieve? Infer from structure, naming, types, comments, tests, and
+   git history — not from what would be nice.
+
+2. **Least astonishment (user expectation).** Name the caller/user persona, then
+   state the behaviour a reasonable such user would expect — the least
+   surprising outcome given the interface, its name, and surrounding
+   conventions.
+
+3. **What the software does now.** The actual current behaviour, traced from the
+   real code path. Read it; run or test it when that's cheap. This is fact, not
+   intent or hope — the gaps between (1), (2), and (3) are where bugs and
+   surprises live.
+
+4. **Recommendation following the documentation.** Treating the docs (README,
+   docstrings, specs, contract comments) as authoritative, what's the right
+   action?
+
+5. **Recommendation ignoring the documentation.** Setting docs aside and
+   reasoning purely from code correctness, author intent, and least
+   astonishment, what's the right action?
+
+**Then synthesise — this is the point, not the five sections:**
+
+- Call out explicitly where author intent, user expectation, and current
+  behaviour **disagree**. Those gaps are the real findings.
+- If (4) and (5) **diverge**, the documentation is out of step with reality. Say
+  so, and recommend which to change: fix the code to match the docs, or fix the
+  docs to match correct behaviour.
+- End with **one** clear recommendation and the single reason it wins.
+
+Keep each lens to a few tight sentences; spend the words on the synthesis.
+
+---
+
+Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
+</code></pre>
+</body>
+</html>
