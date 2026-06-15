@@ -3,15 +3,11 @@
 This repo publishes a standalone, redacted snapshot of the rules, skills, hooks,
 context, settings, and instructions that configure Claude Code's behavior.
 
-## Documents
+## Document
 
-| Format | File | Notes |
-| --- | --- | --- |
-| PDF | [`AI/README-standalone-redacted.pdf`](AI/README-standalone-redacted.pdf) | Renders inline in GitHub's PDF viewer |
-| HTML | [`AI/README-standalone-redacted.html`](AI/README-standalone-redacted.html) | Self-contained; [view raw](../../raw/main/AI/README-standalone-redacted.html) or download to open in a browser |
-
-> GitHub displays `.html` files as source, not as a rendered page — use the PDF
-> above for in-browser reading, or download the HTML.
+The full write-up lives in
+[`AI/README-standalone-redacted.md`](AI/README-standalone-redacted.md), which
+renders natively on GitHub.
 
 ## Overview
 
