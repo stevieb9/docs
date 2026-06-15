@@ -126,7 +126,16 @@ if toc_tail in text:
         1,
     )
 
-# 3. Build the appendix — each linked file embedded verbatim. No <a id> tags;
+# 3. Document footer: put the copyright on its own line below the license.
+#    `text` is the README only (the appendix is appended below), so this targets
+#    the document footer and leaves the verbatim appendix files untouched.
+text = text.replace(
+    "artistic-license-20.html). © 2026 Steve Bertrand.",
+    "artistic-license-20.html).\n\n© 2026 Steve Bertrand.",
+    1,
+)
+
+# 4. Build the appendix — each linked file embedded verbatim. No <a id> tags;
 #    the "### {relpath}" heading's own slug is the anchor target.
 parts = [
     text.rstrip(),

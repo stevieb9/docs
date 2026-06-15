@@ -406,7 +406,9 @@ Skip the rest (`cache/`, `sessions/`, `session-env/`, `shell-snapshots/`, `file-
 
 ---
 
-Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
+Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html).
+
+© 2026 Steve Bertrand.
 
 ## Appendix: bundled resource files
 
