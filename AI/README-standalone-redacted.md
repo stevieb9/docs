@@ -1,26 +1,26 @@
 # AI Configuration
 
-**Redacted for public sharing.** Employer-specific identifiers have been masked: production-adjacent hostnames as `<company-host>`, the internal Perl package as `<COMPANY>`, its env symbol as `<COMPANY_ENV>`, the dev-DB hostname prefix as `<dev-db>`, and the dev-env flag as `<DEV_FLAG>`. Everything else is verbatim.
+> **Redacted for public sharing.** Employer-specific identifiers have been masked: production-adjacent hostnames as `<company-host>`, the internal Perl package as `<COMPANY>`, its env symbol as `<COMPANY_ENV>`, the dev-DB hostname prefix as `<dev-db>`, and the dev-env flag as `<DEV_FLAG>`. Everything else is verbatim.
 
 ## Contents
 
 - [Overview](#overview)
-- [Directory structure](#directory-structure)
-- [Loading structure](#loading-structure)
+  - [Directory structure](#directory-structure)
+  - [Loading structure](#loading-structure)
 - [Phrase commands](#phrase-commands)
 - [Hooks](#hooks)
-- [Scripts](#scripts-hooks)
-- [Settings](#settings-settingsjson)
+  - [Scripts](#scripts-hooks)
+  - [Settings](#settings-settingsjson)
 - [Rules](#rules-rules)
-- [How rules load](#how-rules-load)
-- [git](#gitmd--sessionstart-hook)
-- [perl](#perlmd--pretooluse-hook-on-read)
-- [dev-guardrail](#dev-guardrailmd--pretoolusebash-guard-hostname-gated-zero-token)
+  - [How rules load](#how-rules-load)
+  - [git](#rulesgitmd)
+  - [perl](#rulesperlmd)
+  - [dev-guardrail](#rulesdev-guardrailmd)
 - [Skills](#skills-skills)
-- [Create structured plans with task tracking](#skillscreate-planmd)
-- [Follow a setup doc step-by-step on a clean target](#skillsimplement-from-instruction-filemd)
-- [Sync changes to a remote host for testing](#skillsremote-code-syncmd)
-- [Debate a decision with another looping LLM](#skillsdebatemd)
+  - [Create structured plans with task tracking](#skillscreate-planmd)
+  - [Follow a setup doc step-by-step on a clean target](#skillsimplement-from-instruction-filemd)
+  - [Sync changes to a remote host for testing](#skillsremote-code-syncmd)
+  - [Debate a decision with another looping LLM](#skillsdebatemd)
 - [Context](#context-context)
 - [Instructions](#instructions-instructions)
 - [Ansible Integration](#ansible-integration)
@@ -37,7 +37,7 @@ This directory contains rules, skills, hooks, context, settings, and instruction
 On new systems, symlink the following into `~/.claude/`:
 
 | Repo path | What | `~/.claude/` symlink | Symlink target |
-| --- | --- | --- | --- |
+|-----------|------|----------------------|----------------|
 | `instructions/CLAUDE.md` | Global system prompt loaded into every Claude session | `~/.claude/CLAUDE.md` | `$HOME/repos/config/AI/instructions/CLAUDE.md` |
 | `rules/` | Coding & git conventions, injected by hooks only when relevant | `~/.claude/rules/` | `$HOME/repos/config/AI/rules/` |
 | `skills/` | Reusable multi-step task workflows, invoked on demand | `~/.claude/skills/` | `$HOME/repos/config/AI/skills/` |
@@ -50,23 +50,23 @@ On new systems, symlink the following into `~/.claude/`:
 Everything is conditional — **zero tokens until its trigger fires** (the lone exception is `CLAUDE.md`, always present but currently an empty stub):
 
 | Piece | Trigger | Token use |
-| --- | --- | --- |
+|-------|---------|-----------|
 | `instructions/CLAUDE.md` | Always — the base prompt for every session | Every session (~0, empty) |
 | `rules/git.md` | Working directory is under `~/repos/` or `~/src/git/` — `SessionStart` hook | 0 until in a repo |
 | `rules/perl.md` | You `Read` a Perl file matching its `paths:` patterns — `PreToolUse` hook | 0 until you open Perl |
-| `rules/dev-guardrail.md` | Mechanical gate, not a context load — a `PreToolUse(Bash)` hook arms when cwd is under `~/src/git` **and** the host matches its `hosts:` patterns (), then blocks Bash unless dev is confirmed | 0 always (never enters context; only a block emits text) |
+| `rules/dev-guardrail.md` | Mechanical gate, not a context load — a `PreToolUse(Bash)` hook arms when cwd is under `~/src/git` **and** the host matches its `hosts:` patterns (<company-host>), then blocks Bash unless dev is confirmed | 0 always (never enters context; only a block emits text) |
 | magic-phrase skills & context | An exact phrase in your prompt — see [Phrase commands](#phrase-commands) | 0 until you type it |
 | other `skills/*.md` | Only when you ask Claude to read the file (manual) | 0 until loaded |
 
 ## Phrase commands
 
-Type any of these exact, case-sensitive phrases to summon a skill or framework on demand — **zero idle cost**, dispatched by [`inject-on-phrase.sh`](#appendix-hooks-inject-on-phrase-sh) (one table row each). They fire whether the phrase ends your message or has text after it.
+Type any of these exact, case-sensitive phrases to summon a skill or framework on demand — **zero idle cost**, dispatched by [`inject-on-phrase.sh`](#hooksinject-on-phrasesh) (one table row each). They fire whether the phrase ends your message or has text after it.
 
-| Phrase | What it does | Where | Example you type | Result |
-| --- | --- | --- | --- | --- |
+| Phrase            | What it does | Where | Example you type | Result |
+|-------------------|--------------|-------|------------------|--------|
 | `RECOMMEND TO ME` | Structured recommendation framework | Only in a repo | `RECOMMEND TO ME whether to cache the parsed config in memory` | An analysis through these angles (author intent, least astonishment, current behaviour, with-docs, without-docs) ending in one synthesized verdict |
-| `CREATE A PLAN` | create-plan skill (`.md`-aware naming) | Anywhere | `CREATE A PLAN auth-refactor` | Scaffolds `plans/auth-refactor.md` with a validation table, execution/maintenance rules, and a `NEXT ACTION` line |
-| `PREPARE DEBATE` | debate skill | Anywhere | `PREPARE DEBATE should we keep the trailing-space triggers? 30s` | Creates a `/tmp` channel + a bootstrap prompt to paste into a challenger AI, then the two AIs argue to a verdict |
+| `CREATE A PLAN`   | create-plan skill (`.md`-aware naming) | Anywhere | `CREATE A PLAN auth-refactor` | Scaffolds `plans/auth-refactor.md` with a validation table, execution/maintenance rules, and a `NEXT ACTION` line |
+| `PREPARE DEBATE`  | debate skill | Anywhere | `PREPARE DEBATE should we keep the trailing-space triggers? 30s` | Creates a `/tmp` channel + a bootstrap prompt to paste into a challenger AI, then the two AIs argue to a verdict |
 
 ## Hooks
 
@@ -77,22 +77,18 @@ See the [Claude hooks documentation](https://code.claude.com/docs/en/hooks).
 Key lifecycle events:
 
 - **`SessionStart`** — fires once when a session begins. Use for conditional context injection that depends on the working directory (e.g. repo-specific rules).
-
 - **`UserPromptSubmit`** — fires when you submit a prompt, *before* it's processed. The hook receives the prompt text and cwd, and can inject context or block the prompt. Use it to gate on what you actually typed (e.g. a magic-word trigger).
-
 - **`PreToolUse`** — fires *before* a tool executes. You can inspect the tool input, inject context about the file being operated on, or even block the tool by exiting non-zero.
-
 - **`PostToolUse`** — fires *after* a tool completes. Use for logging, notifications, or post-processing output.
-
 - **`Stop`** — fires when the session ends. Use for cleanup or persistent state writes.
 
-Hooks are configured in [`settings.json`](#appendix-settings-json), symlinked to `~/.claude/settings.json`.
+Hooks are configured in [`settings.json`](#settingsjson), symlinked to `~/.claude/settings.json`.
 
 | Hook | Event | Purpose | Token use |
-| --- | --- | --- | --- |
+|------|-------|---------|-----------|
 | Git rules | `SessionStart` | Injects `git.md` when the working directory is under `~/repos/` or `~/src/git/` | 0 until in a repo |
 | Perl rules | `PreToolUse` on `Read` | Runs `inject-perl-rules.sh` before every file read; on match, injects `perl.md` | 0 until you open Perl |
-| Dev guardrail | `PreToolUse` on `Bash` | Runs `guard-dev-env.sh`; arms when cwd is under `~/src/git` **and** the host matches `dev-guardrail.md`'s `hosts:` patterns (), then blocks Bash unless dev is confirmed (`<DEV_FLAG>` + `<COMPANY_ENV>` + MySQL `@@hostname`). `<DEV_FLAG>` re-checked every call; only the DB check is memoized (per-session, 5-min TTL). Fails closed | 0 on allow (nothing injected); only a block emits text |
+| Dev guardrail | `PreToolUse` on `Bash` | Runs `guard-dev-env.sh`; arms when cwd is under `~/src/git` **and** the host matches `dev-guardrail.md`'s `hosts:` patterns (<company-host>), then blocks Bash unless dev is confirmed (`<DEV_FLAG>` + `<COMPANY_ENV>` + MySQL `@@hostname`). `<DEV_FLAG>` re-checked every call; only the DB check is memoized (per-session, 5-min TTL). Fails closed | 0 on allow (nothing injected); only a block emits text |
 | Phrase commands | `UserPromptSubmit` | `inject-on-phrase.sh` injects the mapped skill/fragment when the prompt contains one of its exact trigger phrases — see [Phrase commands](#phrase-commands) | 0 until you type a phrase |
 
 The hook definitions in `settings.json` (the file also sets `model`, `theme`, and `skipAutoPermissionPrompt`):
@@ -153,20 +149,18 @@ The `UserPromptSubmit` dispatcher (`inject-on-phrase.sh`) takes the opposite tac
 Scripts are executable helpers referenced by hooks — they live in `hooks/` (symlinked to `~/.claude/hooks/`). Inline hook commands in `settings.json` work for simple one-liners, but scripts are the right call when you need:
 
 - **Preprocessing logic** that's too complex for a JSON string — parsing YAML frontmatter, glob/regex matching, conditional branching.
-
 - **Reuse** across multiple hooks or hook events.
-
 - **Debuggability** — a standalone script can be tested and iterated on independently of Claude Code.
 
 | File | Purpose |
-| --- | --- |
-| [`inject-perl-rules.sh`](#appendix-hooks-inject-perl-rules-sh) | PreToolUse hook script. Reads `paths:` patterns from `perl.md` frontmatter, converts them to regexes with python3, and injects the rule content when the file being read matches. The `hooks/` directory is symlinked as `~/.claude/hooks/`. |
-| [`inject-on-phrase.sh`](#appendix-hooks-inject-on-phrase-sh) | UserPromptSubmit **dispatcher**. Reads `.cwd`/`.prompt` from the hook's stdin JSON and injects the file mapped to whichever exact, case-sensitive phrase the prompt contains. Its table: `RECOMMEND TO ME` → `context/recommend.md` (repo-gated), `CREATE A PLAN` → `skills/create-plan.md`, `PREPARE DEBATE` → `skills/debate.md`. Adding a trigger is one table row. Outputs nothing (zero tokens) otherwise; never exits non-zero so it can't block a prompt. |
-| [`guard-dev-env.sh`](#appendix-hooks-guard-dev-env-sh) | PreToolUse(Bash) hook script. Arms only when the cwd is under `~/src/git` **and** the system hostname (`hostname -f`) matches the `hosts:` globs in `dev-guardrail.md` (). When armed, it verifies the dev signals (`<DEV_FLAG>`, `$<COMPANY>::Config::<COMPANY_ENV>`, MySQL `@@hostname =~ /^<dev-db>/`) and **blocks** (exit 2) any Bash command if the environment is not dev — failing closed on error. `<DEV_FLAG>` (free) is re-checked every call; only the DB hostname check is memoized, in a per-session `/tmp` flag with a 5-min TTL, and only with a real `session_id` — so a stale flag can't grant false safety. Allow path emits nothing (zero model tokens); when not armed it exits in a few cheap shell ops (cwd check first, before any `hostname` call or DB connect). Patterns live in one place: the rule file's frontmatter. |
+|------|---------|
+| [`inject-perl-rules.sh`](#hooksinject-perl-rulessh) | PreToolUse hook script. Reads `paths:` patterns from `perl.md` frontmatter, converts them to regexes with python3, and injects the rule content when the file being read matches. The `hooks/` directory is symlinked as `~/.claude/hooks/`. |
+| [`inject-on-phrase.sh`](#hooksinject-on-phrasesh) | UserPromptSubmit **dispatcher**. Reads `.cwd`/`.prompt` from the hook's stdin JSON and injects the file mapped to whichever exact, case-sensitive phrase the prompt contains. Its table: `RECOMMEND TO ME` → `context/recommend.md` (repo-gated), `CREATE A PLAN` → `skills/create-plan.md`, `PREPARE DEBATE` → `skills/debate.md`. Adding a trigger is one table row. Outputs nothing (zero tokens) otherwise; never exits non-zero so it can't block a prompt. |
+| [`guard-dev-env.sh`](#hooksguard-dev-envsh) | PreToolUse(Bash) hook script. Arms only when the cwd is under `~/src/git` **and** the system hostname (`hostname -f`) matches the `hosts:` globs in `dev-guardrail.md` (<company-host>). When armed, it verifies the dev signals (`<DEV_FLAG>`, `$<COMPANY>::Config::<COMPANY_ENV>`, MySQL `@@hostname =~ /^<dev-db>/`) and **blocks** (exit 2) any Bash command if the environment is not dev — failing closed on error. `<DEV_FLAG>` (free) is re-checked every call; only the DB hostname check is memoized, in a per-session `/tmp` flag with a 5-min TTL, and only with a real `session_id` — so a stale flag can't grant false safety. Allow path emits nothing (zero model tokens); when not armed it exits in a few cheap shell ops (cwd check first, before any `hostname` call or DB connect). Patterns live in one place: the rule file's frontmatter. |
 
 ### Settings (`settings.json`)
 
-[`settings.json`](#appendix-settings-json) is the global Claude Code settings file, symlinked to `~/.claude/settings.json`. It contains hook definitions, model preference, theme, and the `skipAutoPermissionPrompt` flag. The hooks use `$HOME`-relative paths (`~/.claude/…` and the repo clone under `~/repos/`), so they resolve whether `$HOME` is `/Users/steve` or `/home/steve`.
+[`settings.json`](#settingsjson) is the global Claude Code settings file, symlinked to `~/.claude/settings.json`. It contains hook definitions, model preference, theme, and the `skipAutoPermissionPrompt` flag. The hooks use `$HOME`-relative paths (`~/.claude/…` and the repo clone under `~/repos/`), so they resolve whether `$HOME` is `/Users/steve` or `/home/steve`.
 
 ## Rules (`rules/`)
 
@@ -177,10 +171,10 @@ The **project memory system** (`~/.claude/projects/<project>/memory/`) also stor
 **Important — rules are *not* auto-loaded.** Claude Code has no `~/.claude/rules/` auto-load mechanism, and `~/.claude/CLAUDE.md` is empty, so nothing pulls these files into context on its own. Each rule reaches context **only** when a hook injects it — so a rule costs **zero tokens** until its trigger fires. Mechanically this is identical to [`context/`](#context-context); the difference is intent (a standing convention vs. an occasional fragment), not loading. The frontmatter is read by the *hooks*, not by Claude Code: `perl.md`'s `paths:` patterns are the live matcher (see below), while `git.md`'s `globs:` are inert — its gate is hardcoded in the `settings.json` `SessionStart` command.
 
 | File | Purpose | Token use |
-| --- | --- | --- |
-| [`git.md`](#appendix-rules-git-md) | Git rules — never commit on the user's behalf; concise commit messages with no AI attribution footers. Injected at SessionStart when the working directory is under `~/repos/` or `~/src/git/`. | 0 until in a repo |
-| [`perl.md`](#appendix-rules-perl-md) | Perl coding conventions — operator, comma, and call spacing; brace style; subroutine placement and ordering (alpha, public then private); positional-parameter validation order; comment and Changes-entry capitalization; and Changes-file update position. Injected before Claude reads a file matching the `paths:` patterns in its frontmatter. | 0 until you open Perl |
-| [`dev-guardrail.md`](#appendix-rules-dev-guardrail-md) | Dev-environment guardrail for production-adjacent hosts. Not injected context — it is the host-pattern source and documentation for the `guard-dev-env.sh` `PreToolUse(Bash)` hook, which mechanically blocks Bash on matching hosts () unless all three dev signals (`<DEV_FLAG>`, `$<COMPANY>::Config::<COMPANY_ENV>`, MySQL `@@hostname =~ /^<dev-db>/`) confirm dev. | 0 always (never enters context) |
+|------|---------|-----------|
+| [`git.md`](#rulesgitmd) | Git rules — never commit on the user's behalf; concise commit messages with no AI attribution footers. Injected at SessionStart when the working directory is under `~/repos/` or `~/src/git/`. | 0 until in a repo |
+| [`perl.md`](#rulesperlmd) | Perl coding conventions — operator, comma, and call spacing; brace style; subroutine placement and ordering (alpha, public then private); positional-parameter validation order; comment and Changes-entry capitalization; and Changes-file update position. Injected before Claude reads a file matching the `paths:` patterns in its frontmatter. | 0 until you open Perl |
+| [`dev-guardrail.md`](#rulesdev-guardrailmd) | Dev-environment guardrail for production-adjacent hosts. Not injected context — it is the host-pattern source and documentation for the `guard-dev-env.sh` `PreToolUse(Bash)` hook, which mechanically blocks Bash on matching hosts (<company-host>) unless all three dev signals (`<DEV_FLAG>`, `$<COMPANY>::Config::<COMPANY_ENV>`, MySQL `@@hostname =~ /^<dev-db>/`) confirm dev. | 0 always (never enters context) |
 
 ### How rules load
 
@@ -192,13 +186,13 @@ Git rules apply to every git operation, not just file reads, so they need sessio
 
 #### perl.md — PreToolUse hook on Read
 
-`perl.md` is injected on demand: a `PreToolUse` hook on `Read` fires [`inject-perl-rules.sh`](#appendix-hooks-inject-perl-rules-sh) whenever Claude is about to read a file. The script extracts the `paths:` patterns from `perl.md`'s YAML frontmatter, converts them to regexes, and checks whether the file path matches. On match, it injects the rule content as `additionalContext` *before* the read completes — so Perl conventions are in context when Claude processes the file.
+`perl.md` is injected on demand: a `PreToolUse` hook on `Read` fires [`inject-perl-rules.sh`](#hooksinject-perl-rulessh) whenever Claude is about to read a file. The script extracts the `paths:` patterns from `perl.md`'s YAML frontmatter, converts them to regexes, and checks whether the file path matches. On match, it injects the rule content as `additionalContext` *before* the read completes — so Perl conventions are in context when Claude processes the file.
 
 The `paths:` frontmatter in `perl.md` is the single source of truth for which files trigger the Perl rules. Update that file to adjust matching — no need to touch the script.
 
 #### dev-guardrail.md — PreToolUse(Bash) guard (hostname-gated, zero-token)
 
-The dev guardrail is host- and directory-scoped and, unlike `git.md`/`perl.md`, it is **never injected into context** — it is a mechanical gate, not a load. A `PreToolUse` hook on `Bash` runs [`guard-dev-env.sh`](#appendix-hooks-guard-dev-env-sh), which arms only when **both** the working directory is under `~/src/git` **and** the system hostname (`hostname -f`, falling back to `hostname`) matches the `hosts:` globs in `dev-guardrail.md` — any host under `<company-host>`. When armed it verifies all three dev signals (`<DEV_FLAG>`, `$<COMPANY>::Config::<COMPANY_ENV>`, and the authoritative MySQL `@@hostname =~ /^<dev-db>/`) and **blocks the command** (exit 2, with a reason Claude Code surfaces) whenever the environment is not dev — failing **closed** if the check itself errors.
+The dev guardrail is host- and directory-scoped and, unlike `git.md`/`perl.md`, it is **never injected into context** — it is a mechanical gate, not a load. A `PreToolUse` hook on `Bash` runs [`guard-dev-env.sh`](#hooksguard-dev-envsh), which arms only when **both** the working directory is under `~/src/git` **and** the system hostname (`hostname -f`, falling back to `hostname`) matches the `hosts:` globs in `dev-guardrail.md` — any host under `<company-host>`. When armed it verifies all three dev signals (`<DEV_FLAG>`, `$<COMPANY>::Config::<COMPANY_ENV>`, and the authoritative MySQL `@@hostname =~ /^<dev-db>/`) and **blocks the command** (exit 2, with a reason Claude Code surfaces) whenever the environment is not dev — failing **closed** if the check itself errors.
 
 The hook runs before *every* Bash call (that is what lets it block a command, which a one-time `SessionStart` hook cannot do), but it is cheap when it does not apply: the cwd gate is checked first, so outside `~/src/git` it exits before even calling `hostname`, and on a non-matching host it exits right after — no DB connect, no tokens, sub-millisecond. On the allow path it emits nothing, so it costs **zero model tokens** every turn (the reason it replaced an earlier SessionStart injection, whose ~450 resident tokens were re-billed on every 5-minute cache lapse in long sessions). To keep the armed path fast without trusting `/tmp` blindly: `<DEV_FLAG>` (a free env var) is re-checked on every armed call, while only the expensive `<COMPANY_ENV>` + MySQL check is memoized — in a per-session flag with a 5-minute TTL, written only when a real `session_id` is present — so a stale flag can never grant false safety. Like `perl.md`'s `paths:`, the `hosts:` frontmatter is the single source of truth — edit the rule file to change which hosts trigger it, no script change needed.
 
@@ -209,35 +203,30 @@ Skills are reusable slash-command workflows that teach Claude how to perform spe
 **When to use a skill vs. a rule vs. a hook:**
 
 - **Rule** — a *standing constraint* you want applied every turn (e.g. "never commit", "use this brace style"). Rules shape *how* Claude works.
-
 - **Hook** — an *event-driven automation* that fires at lifecycle points. Hooks inject *context* or *gate* tool use automatically.
-
 - **Skill** — a *named workflow* you invoke on demand (e.g. "/create-plan"). Skills teach Claude *what to do* for a specific job.
 
 **Why skills are useful:**
 
 - **Consistency** — the same procedure runs the same way every time, regardless of which model or session is active.
-
 - **Knowledge capture** — you encode your preferred approach once and reuse it. No need to re-explain "how I like to do X" each session.
-
 - **Delegation** — skills turn complex multi-step tasks into a single `/command`. Hand off planning, code review, or deployment workflows without micromanaging.
 
 Two layouts, chosen by token cost:
 
 - **Flat file** (`skills/foo.md`) — manual load only. You tell the AI to read it; it's used once, then gone. **Zero ongoing token cost.**
-
 - **Directory with `SKILL.md`** (`skills/foo/SKILL.md`) — session auto-load. Registered as a slash command (`/foo`), loaded into context at session start and **stays there every turn**, consuming tokens whether used or not.
 
 **Choosing a layout:** Use flat files for specialized or infrequent workflows (incident response, one-off migrations). Reserve directory-based skills for commands you reach for daily — the token cost of always-on context is worth it when the workflow is a core part of your routine.
 
-**Magic-phrase auto-load (a third option):** Pair a flat-file skill with the `UserPromptSubmit` dispatcher ([`inject-on-phrase.sh`](#appendix-hooks-inject-on-phrase-sh)) that watches for an exact trigger phrase, and it auto-injects on demand — no slash command, no always-on cost. `create-plan.md` does this: typing `CREATE A PLAN` injects the whole skill for that turn (anywhere — no repo gate), and nothing loads otherwise. Best of both layouts — zero idle tokens like a flat file, a passive trigger like a directory skill — but you opt in with a deliberate phrase. See [Phrase commands](#phrase-commands) for all of them.
+**Magic-phrase auto-load (a third option):** Pair a flat-file skill with the `UserPromptSubmit` dispatcher ([`inject-on-phrase.sh`](#hooksinject-on-phrasesh)) that watches for an exact trigger phrase, and it auto-injects on demand — no slash command, no always-on cost. `create-plan.md` does this: typing `CREATE A PLAN` injects the whole skill for that turn (anywhere — no repo gate), and nothing loads otherwise. Best of both layouts — zero idle tokens like a flat file, a passive trigger like a directory skill — but you opt in with a deliberate phrase. See [Phrase commands](#phrase-commands) for all of them.
 
-|  | File | Method | Token use |
-| --- | --- | --- | --- |
-| Create structured plans with task tracking | [`create-plan.md`](#appendix-skills-create-plan-md) | Manual, or auto-injected on `CREATE A PLAN` (`UserPromptSubmit`) | Zero unless triggered |
-| Follow a setup doc step-by-step on a clean target | [`implement-from-instruction-file.md`](#appendix-skills-implement-from-instruction-file-md) | Manual | Zero once read |
-| Sync changes to a remote host for testing | [`remote-code-sync.md`](#appendix-skills-remote-code-sync-md) | Manual | Zero once read |
-| Debate a decision with another looping LLM | [`debate.md`](#appendix-skills-debate-md) | Manual, or auto-injected on `PREPARE DEBATE` (`UserPromptSubmit`) | Zero unless triggered |
+| | File | Method | Token use |
+|---|------|--------|-----------|
+| Create structured plans with task tracking | [`create-plan.md`](#skillscreate-planmd) | Manual, or auto-injected on `CREATE A PLAN` (`UserPromptSubmit`) | Zero unless triggered |
+| Follow a setup doc step-by-step on a clean target | [`implement-from-instruction-file.md`](#skillsimplement-from-instruction-filemd) | Manual | Zero once read |
+| Sync changes to a remote host for testing | [`remote-code-sync.md`](#skillsremote-code-syncmd) | Manual | Zero once read |
+| Debate a decision with another looping LLM | [`debate.md`](#skillsdebatemd) | Manual, or auto-injected on `PREPARE DEBATE` (`UserPromptSubmit`) | Zero unless triggered |
 
 ## Context (`context/`)
 
@@ -246,21 +235,21 @@ Context fragments are like rules: **neither is auto-loaded**, and both cost **ze
 `context/` is symlinked to `~/.claude/context/` (so it's visible alongside the other dirs), but Claude never loads the directory on its own — the only thing that surfaces a fragment is a hook that reads it and emits it as `additionalContext`.
 
 | File | Injected by | When | Token use |
-| --- | --- | --- | --- |
-| [`recommend.md`](#appendix-context-recommend-md) | `inject-on-phrase.sh` (`UserPromptSubmit` dispatcher) | cwd is under `~/repos/`/`~/src/git/` **and** the prompt contains the exact phrase `RECOMMEND TO ME` | 0 until you type it in a repo |
+|------|-------------|------|-----------|
+| [`recommend.md`](#contextrecommendmd) | `inject-on-phrase.sh` (`UserPromptSubmit` dispatcher) | cwd is under `~/repos/`/`~/src/git/` **and** the prompt contains the exact phrase `RECOMMEND TO ME` | 0 until you type it in a repo |
 
 ### recommend.md — the recommendation framework
 
 When triggered, it makes Claude answer a recommendation request through these angles — author intent (inferred from code), least astonishment (user expectation), current behaviour, the with-documentation recommendation, and the without-documentation recommendation — then synthesise where they disagree and give one verdict.
 
-The trigger is deliberately an exact, case-sensitive, all-caps phrase (`RECOMMEND TO ME`) so it never fires by accident. The `TABLE` in [`inject-on-phrase.sh`](#appendix-hooks-inject-on-phrase-sh) is the single source of truth for the phrase, its target file, and the repo-gate — edit that one row to change the magic words.
+The trigger is deliberately an exact, case-sensitive, all-caps phrase (`RECOMMEND TO ME`) so it never fires by accident. The `TABLE` in [`inject-on-phrase.sh`](#hooksinject-on-phrasesh) is the single source of truth for the phrase, its target file, and the repo-gate — edit that one row to change the magic words.
 
 ## Instructions (`instructions/`)
 
 Instructions provide the base system prompt and are loaded into every Claude Code session.
 
 | File | Purpose | Token use |
-| --- | --- | --- |
+|------|---------|-----------|
 | `CLAUDE.md` | System-level instructions for Claude Code. Currently an empty stub — symlinked to `~/.claude/CLAUDE.md`. Populate this file with project-wide context, conventions, and preferences that should apply to every session. | Every session (~0, empty) |
 
 ## Ansible Integration
@@ -268,12 +257,12 @@ Instructions provide the base system prompt and are loaded into every Claude Cod
 This repo coordinates with the Ansible configuration in `~/repos/devops/ansible/`:
 
 | Topic | Location | Purpose |
-| --- | --- | --- |
+|-------|----------|---------|
 | Consolidated playbook | `~/repos/devops/ansible/site.yml` | Single-command provisioning (all hosts, by category, per-role). Tagged for granular control. |
 | SOPS secrets | `~/repos/devops/README-SOPS-ENCRYPTION.md` | Comprehensive guide to encrypted secrets management, age key generation, Ansible deployment, key rotation, recovery. |
 | Secrets role | `~/repos/devops/ansible/roles/config/secrets/` | Generates age keypairs on targets, decrypts and deploys encrypted API credentials and SSH keys. |
 | Encrypted files | `~/repos/config/secrets/{api,ssh}/` | Encrypted credential files (twilio/cloudflare/godaddy JSON, github/ansible RSA keys, Claude Code OAuth token). Deployed by Ansible. |
-| Claude AI install | `~/repos/devops/ansible/roles/install/claude-ai/` | Installs the Claude Code CLI via the official install script (`curl -fsSL https://claude.ai/install.sh \\| bash`). |
+| Claude AI install | `~/repos/devops/ansible/roles/install/claude-ai/` | Installs the Claude Code CLI via the official install script (`curl -fsSL https://claude.ai/install.sh \| bash`). |
 | Claude AI config | `~/repos/devops/ansible/roles/config/claude-ai/` | Symlinks this repo's `AI/` contents (`hooks/`, `skills/`, `rules/`, `context/`, `settings.json`, `CLAUDE.md`) into `~/.claude/`, sources `~/.claude/oauth.env` from `~/.bash_profile` and `~/.bashrc` (sets `CLAUDE_CODE_OAUTH_TOKEN` for headless auth in both login and non-login shells), marks onboarding complete in `~/.claude.json` (skips the first-run TUI wizard), and adds a `claude-ds` wrapper for routing Claude through a DeepSeek API backend. |
 
 ### Deploying
@@ -302,11 +291,8 @@ Drop `-l <host>` to target all hosts; `ansible-playbook site.yml --list-tags` li
 When editing Ansible files in `~/repos/devops/ansible/`:
 
 - **Playbook syntax:** `ansible-playbook site.yml --syntax-check`
-
 - **Lint (production profile):** `ansible-lint` from repo root
-
 - **Tag workflow:** Use `--tags` to target specific roles or categories (install, config, git, secrets, etc.)
-
 - **Live validation:** Run on Lima test VM (`ubuntu-test` in hosts inventory) before deploying to production
 
 ### SOPS+age secrets in Ansible context
@@ -314,9 +300,7 @@ When editing Ansible files in `~/repos/devops/ansible/`:
 Encrypted secrets are managed by the `config/secrets` Ansible role:
 
 1. **Target setup:** role generates age keypair on target if missing
-
 2. **Decryption:** sops decrypts files on target using target's own age key
-
 3. **Deployment:** decrypted credentials written to `~/` and `~/.ssh/` with correct permissions
 
 For multi-machine setup, public keys are listed in `~/repos/config/.sops.yaml` so any authorized machine can decrypt. See `~/repos/devops/README-SOPS-ENCRYPTION.md` for the full workflow (key generation, adding machines, rotation, recovery).
@@ -326,9 +310,7 @@ For multi-machine setup, public keys are listed in `~/repos/config/.sops.yaml` s
 Headless Ansible hosts can't use the interactive browser `/login`, so Claude Code authenticates with a long-lived token from `claude setup-token` (valid ~1 year), exposed via the `CLAUDE_CODE_OAUTH_TOKEN` environment variable:
 
 1. **Mint once** — run `claude setup-token` and capture the printed token into `~/.claude/oauth.env` as `export CLAUDE_CODE_OAUTH_TOKEN=...` (`0600`). `setup-token` only prints the token; it does not install it.
-
 2. **Encrypt** — SOPS-encrypt it to `~/repos/config/secrets/api/claude_oauth.env.enc` (same age recipients as the other secrets).
-
 3. **Deploy** — `config/secrets` decrypts it to `~/.claude/oauth.env`; `config/claude-ai` sources that file from both `~/.bash_profile` (login shells) and `~/.bashrc` (non-login interactive shells, e.g. tmux panes), so the token is set in every terminal and `claude` skips the login prompt.
 
 Re-mint and re-encrypt when the token expires (~yearly). Minting tip: the OAuth URL truncates when copied from a wrapping terminal — open it from the Mac with `open -a Safari '<url>'`, and include the token's trailing wrapped characters (a run of `A`s is base64 padding).
@@ -410,23 +392,16 @@ claude   # starts already authed, no first-run wizard
 These items are symlinked into `~/.claude/` from this repo, so committing and pushing backs them up:
 
 - **`instructions/CLAUDE.md`** → `~/.claude/CLAUDE.md`
-
 - **`rules/`** → `~/.claude/rules/`
-
 - **`skills/`** → `~/.claude/skills/`
-
 - **`hooks/`** → `~/.claude/hooks/`
-
 - **`context/`** → `~/.claude/context/`
-
 - **`settings.json`** → `~/.claude/settings.json`
 
 Beyond the symlinks, only a few real files in `~/.claude/` are worth saving:
 
 - **`keybindings.json`** — custom key bindings (if used).
-
 - **`projects/`** — chat transcripts and learned memory.
-
 - **`plans/`, `tasks/`** — only if you use those features.
 
 Skip the rest (`cache/`, `sessions/`, `session-env/`, `shell-snapshots/`, `file-history/`, `telemetry/`, `daemon*`, `plugins/`) — it regenerates.
@@ -437,13 +412,11 @@ Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artisti
 
 ## Appendix: bundled resource files
 
-Every relative link above resolves here. Each rules / skills / hooks / context file and `settings.json` is embedded verbatim so this document is fully self-contained — no access to the source repo required. Cross-references between these files point to their sections below.
-
-[]()
+Every relative link above resolves here. Each rules / skills / hooks / context file and `settings.json` is embedded verbatim so this document is fully self-contained — no access to the source repo required.
 
 ### settings.json
 
-```json
+~~~~json
 {
   "model": "opus",
   "hooks": {
@@ -491,13 +464,11 @@ Every relative link above resolves here. Each rules / skills / hooks / context f
   "theme": "light",
   "skipAutoPermissionPrompt": true
 }
-```
-
-[]()
+~~~~
 
 ### rules/git.md
 
-```markdown
+~~~~markdown
 ---
 globs:
   - "**/repos/**/*"
@@ -525,13 +496,11 @@ When asked for a commit message:
 ---
 
 Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
-```
-
-[]()
+~~~~
 
 ### rules/perl.md
 
-````markdown
+~~~~markdown
 ---
 paths:
   - "lib/**/*.{pl,pm}"
@@ -836,13 +805,11 @@ sub read_config {
 ---
 
 Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
-````
-
-[]()
+~~~~
 
 ### rules/dev-guardrail.md
 
-```markdown
+~~~~markdown
 ---
 hosts:
   - "*<company-host>*"
@@ -889,13 +856,11 @@ This file is no longer injected into context. It remains the single source of tr
 ---
 
 Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
-```
-
-[]()
+~~~~
 
 ### skills/create-plan.md
 
-````markdown
+~~~~markdown
 ---
 name: create-plan
 description: Structured project planning with stable IDs, status tracking, discovery tracking, and archive workflow. Creates and resumes plan files (validation tables, backlogs, maintenance rules) in a plans/ directory under the current working directory.
@@ -1134,13 +1099,11 @@ B2: another improvement
 ---
 
 Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
-````
-
-[]()
+~~~~
 
 ### skills/implement-from-instruction-file.md
 
-```markdown
+~~~~markdown
 ---
 name: implement-from-instruction-file
 description: Mechanically follow a setup/install/migration doc on a clean target to actually implement what it describes; gaps in the doc surface naturally because you only do what the doc says, nothing more
@@ -1167,13 +1130,11 @@ Don't validate the doc by re-reading it. "I forgot I did this earlier" assumptio
 ---
 
 Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
-```
-
-[]()
+~~~~
 
 ### skills/remote-code-sync.md
 
-```markdown
+~~~~markdown
 ---
 name: remote-code-sync
 description: Sync code changes to a remote test host via rsync during iterative work; on task completion, list uncommitted files and suggest a concise commit message for the user to run themselves
@@ -1206,13 +1167,11 @@ Supersedes any earlier reading of "tell me when you need me to push/pull" — th
 ---
 
 Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
-```
-
-[]()
+~~~~
 
 ### skills/debate.md
 
-````markdown
+~~~~markdown
 ---
 name: debate
 description: Set up and run a turn-based debate between Claude and another (anonymous) LLM challenger, converge on a decision, and write the transcript to proposal/<topic>.md in the cwd. The two AIs communicate exclusively through one shared /tmp channel file — Claude creates and monitors it; the challenger reads it and appends its turns into the same file. There are no transport choices and no questions about who the challenger is or how it is reached.
@@ -1588,13 +1547,11 @@ TBD — awaiting user.
 ---
 
 Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
-````
-
-[]()
+~~~~
 
 ### hooks/inject-perl-rules.sh
 
-```bash
+~~~~bash
 #!/bin/bash
 #
 # Copyright (c) 2026 Steve Bertrand
@@ -1675,13 +1632,11 @@ jq -n --arg content "$(cat "$rules_file")" '{
         additionalContext: $content
     }
 }'
-```
-
-[]()
+~~~~
 
 ### hooks/inject-on-phrase.sh
 
-```bash
+~~~~bash
 #!/usr/bin/env bash
 #
 # Copyright (c) 2026 Steve Bertrand
@@ -1735,13 +1690,11 @@ done <<< "$TABLE"
 
 [ -n "$out" ] || exit 0
 printf '%s' "$out" | jq -Rs '{hookSpecificOutput:{hookEventName:"UserPromptSubmit",additionalContext:.}}'
-```
-
-[]()
+~~~~
 
 ### hooks/guard-dev-env.sh
 
-```bash
+~~~~bash
 #!/bin/bash
 #
 # Copyright (c) 2026 Steve Bertrand
@@ -1833,13 +1786,11 @@ print "ok";
 # Confirmed dev — memoize (only with a real session_id) and allow
 [ -n "$flag" ] && { : > "$flag" 2>/dev/null || true; }
 exit 0
-```
-
-[]()
+~~~~
 
 ### context/recommend.md
 
-```markdown
+~~~~markdown
 # Recommendation Framework
 
 > **Precedence:** these instructions and the user's live instruction override any stored memory. If a recalled memory conflicts, follow this file / the user — memory is a default, not a constraint.
@@ -1886,4 +1837,4 @@ Keep each lens to a few tight sentences; spend the words on the synthesis.
 ---
 
 Licensed under the [Artistic License 2.0](https://www.perlfoundation.org/artistic-license-20.html). © 2026 Steve Bertrand.
-```
+~~~~
